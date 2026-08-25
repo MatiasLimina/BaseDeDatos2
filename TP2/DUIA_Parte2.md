@@ -3,8 +3,8 @@
 | Campo | Completar |
 |---|---|
 | **Herramienta** | OpenCode (modelo `google/gemini-3.5-flash-lite`) |
-| **Spec o prompt utilizado** | Generar la estructura y redacción técnica para el archivo `informe_concurrencia.md` documentando la reproducción de tres escenarios de concurrencia: Espera por bloqueo (Lock Waiting), Lectura no repetible (Non-repeatable Read) y Lectura fantasma (Phantom Read) sobre el esquema Food Store en PostgreSQL. |
-| **Qué generó** | La estructura completa del informe de concurrencia, incluyendo los comandos SQL exactos para ambas sesiones (Sesión A y Sesión B) en cada escenario, las explicaciones teóricas de la IA, y las conclusiones de verificación en el motor. |
-| **Qué se aceptó** | La estructura de bloques por escenario, los scripts SQL orientados a las tablas `producto` y `pedido` de nuestro proyecto, y las explicaciones de MVCC y bloqueos a nivel de fila. |
-| **Qué se modificó o descartó, y por qué** | Se ajustaron los IDs y nombres de los productos utilizados en los ejemplos (`id = 1`, `categoria_id = 1`) para que coincidan exactamente con los datos de prueba definidos en nuestro archivo `seed.sql`. |
-| **Verificación realizada** | Se ejecutaron los scripts concurrentemente en dos pestañas de DBeaver contra `foodstore_copia`, confirmando que los bloqueos de fila, las lecturas no repetibles y las lecturas fantasma se comportaron exactamente como se documentó en el informe. |
+| **Spec o prompt utilizado** | Generar la estructura y redacción detallada para el `informe_concurrencia.md` reproduciendo los escenarios de Lectura No Repetible, Espera por Bloqueo (`FOR UPDATE`) y Lectura Fantasma sobre las tablas del proyecto Food Store en PostgreSQL. |
+| **Qué generó** | La estructura completa del informe de concurrencia con los comandos exactos de Sesión A y Sesión B, explicaciones técnicas de los niveles de aislamiento y la verificación en el motor. |
+| **Qué se aceptó** | La estructura metodológica, los bloques de comandos SQL específicos para las tablas `producto` y `pedido` de Food Store, y las explicaciones sobre MVCC y bloqueos en PostgreSQL. |
+| **Qué se modificó o descartó, y por qué** | Se ajustaron los ejemplos de valores y sentencias SQL para que coincidan exactamente con los datos de carga inicial (`seed.sql`) del proyecto Food Store. |
+| **Verificación realizada** | Ejecución práctica en dos sesiones paralelas de `psql` / DBeaver, confirmando el comportamiento de `READ COMMITTED` vs `REPEATABLE READ` y la retención de bloqueos con `FOR UPDATE`. |
