@@ -380,3 +380,353 @@ El plan de indexado cumple su objetivo didáctico: no todos los índices propues
 | **Verificación realizada** | Contrastación manual de cada `EXPLAIN ANALYZE` (ANTES/DESPUÉS) con `Anotacion_mediciones.txt`; verificación de que la Consulta 2 mantiene `Seq Scan` y la Consulta 3 ya usaba `Index Scan` vía PK antes del nuevo índice; revisión del efecto de `shared_buffers` en la medición de `INSERT` |
 
 > Registro respecto a la sobreindexación: la IA sugirió el índice en `forma_pago`, pero por criterio técnico fue descartado — ver §6 y `Anotacion_mediciones.txt:44-52`.
+
+
+---
+
+## 8. TP3 Parte B — Verificación de equivalencia de vistas (`views.sql`)
+
+**Fecha:** 05/09/2026  
+**Entregables asociados:** `Proyecto_Integrador/database/views.sql` · `Proyecto_Integrador/specs/spec_punto_4.2/requirements.md`
+
+---
+
+### 8.1 Vistas creadas
+
+| Vista | Tablas involucradas | Criterio especial |
+|---|---|---|
+| `vw_productos_vigentes` | `producto`, `categoria` | Filtro de baja lógica: `producto.activo = TRUE AND categoria.activo = TRUE` |
+| `vw_pedidos_cliente` | `pedido`, `cliente` | Seguridad: omite `cliente.email`, `cliente.telefono`, `cliente.created_at` |
+| `vw_detalle_pedido` | `pedido_detalle`, `producto` | JOIN por `producto_id`; expone nombre legible del producto |
+
+---
+
+### 8.2 Metodología de verificación de equivalencia
+
+Para cada vista se ejecutaron dos operaciones `EXCEPT` simétricas (`views.sql:69-145`):
+
+```
+(consulta_via_vista)   EXCEPT (consulta_manual)   → debe retornar 0 filas
+(consulta_manual)      EXCEPT (consulta_via_vista) → debe retornar 0 filas
+```
+
+Si ambas direcciones retornan 0 filas, la vista es **equivalente** a su consulta manual: no introduce filas extras ni omite filas presentes. La verificación se ejecutó sobre la base poblada con `seed.sql` (datos de prueba del TP1/TP2).
+
+---
+
+### 8.3 Resultados de equivalencia
+
+#### Vista 1 — `vw_productos_vigentes`
+
+```sql
+-- Dirección vista → manual
+(SELECT id, nombre, precio, stock, nombre_categoria, created_at
+ FROM vw_productos_vigentes)
+EXCEPT
+(SELECT p.id, p.nombre, p.precio, p.stock, c.nombre, p.created_at
+ FROM producto p JOIN categoria c ON p.categoria_id = c.id
+ WHERE p.activo = TRUE AND c.activo = TRUE);
+-- Resultado: 0 filas  ✓
+
+-- Dirección manual → vista
+(SELECT p.id, p.nombre, p.precio, p.stock, c.nombre, p.created_at
+ FROM producto p JOIN categoria c ON p.categoria_id = c.id
+ WHERE p.activo = TRUE AND c.activo = TRUE)
+EXCEPT
+(SELECT id, nombre, precio, stock, nombre_categoria, created_at
+ FROM vw_productos_vigentes);
+-- Resultado: 0 filas  ✓
+```
+
+**Conclusión:** Equivalencia verificada. La vista incorpora correctamente el filtro doble de vigencia.
+
+---
+
+#### Vista 2 — `vw_pedidos_cliente`
+
+```sql
+-- Dirección vista → manual
+(SELECT pedido_id, fecha, forma_pago, cliente_id, nombre, apellido, cliente_activo
+ FROM vw_pedidos_cliente)
+EXCEPT
+(SELECT p.id, p.fecha, p.forma_pago, c.id, c.nombre, c.apellido, c.activo
+ FROM pedido p JOIN cliente c ON p.cliente_id = c.id);
+-- Resultado: 0 filas  ✓
+
+-- Dirección manual → vista
+(SELECT p.id, p.fecha, p.forma_pago, c.id, c.nombre, c.apellido, c.activo
+ FROM pedido p JOIN cliente c ON p.cliente_id = c.id)
+EXCEPT
+(SELECT pedido_id, fecha, forma_pago, cliente_id, nombre, apellido, cliente_activo
+ FROM vw_pedidos_cliente);
+-- Resultado: 0 filas  ✓
+```
+
+**Conclusión:** Equivalencia verificada. Las columnas excluidas (`email`, `telefono`, `created_at`) no alteran la cardinalidad ni la identidad de las filas.
+
+**Nota sobre el criterio de seguridad:** La tabla `cliente` del esquema actual no tiene columna `contrasena`. La vista demuestra el patrón de ocultación con `email` y `telefono` (datos de contacto personal). Un rol con `GRANT SELECT ON vw_pedidos_cliente TO role_reporte` no puede acceder a esas columnas ni mediante `SELECT *` ni mediante consulta directa sobre la vista, porque no forman parte de su definición.
+
+---
+
+#### Vista 3 — `vw_detalle_pedido`
+
+```sql
+-- Dirección vista → manual
+(SELECT pedido_id, nombre_producto, cantidad, precio_unitario, subtotal
+ FROM vw_detalle_pedido)
+EXCEPT
+(SELECT pd.pedido_id, pr.nombre, pd.cantidad, pd.precio_unitario, pd.subtotal
+ FROM pedido_detalle pd JOIN producto pr ON pd.producto_id = pr.id);
+-- Resultado: 0 filas  ✓
+
+-- Dirección manual → vista
+(SELECT pd.pedido_id, pr.nombre, pd.cantidad, pd.precio_unitario, pd.subtotal
+ FROM pedido_detalle pd JOIN producto pr ON pd.producto_id = pr.id)
+EXCEPT
+(SELECT pedido_id, nombre_producto, cantidad, precio_unitario, subtotal
+ FROM vw_detalle_pedido);
+-- Resultado: 0 filas  ✓
+```
+
+**Conclusión:** Equivalencia verificada. La vista puede filtrarse por `WHERE pedido_id = :id` con el mismo resultado que la consulta manual equivalente.
+
+---
+
+### 8.4 Resumen
+
+| Vista | Dir. vista→manual | Dir. manual→vista | Equivalencia |
+|---|:---:|:---:|:---:|
+| `vw_productos_vigentes` | 0 filas ✓ | 0 filas ✓ | **Verificada** |
+| `vw_pedidos_cliente` | 0 filas ✓ | 0 filas ✓ | **Verificada** |
+| `vw_detalle_pedido` | 0 filas ✓ | 0 filas ✓ | **Verificada** |
+
+Las tres vistas son equivalentes a sus consultas manuales correspondientes. El criterio de seguridad de `vw_pedidos_cliente` excluye correctamente `email`, `telefono` y `created_at` sin romper la equivalencia de filas.
+
+---
+
+## Nota — Declaración de Uso de IA (DUIA) — Parte B
+
+| Campo | Detalle |
+|---|---|
+| **Herramienta** | Kiro (agente de especificación) |
+| **Qué generó** | `requirements.md` (Parte B), `views.sql` (3 vistas + 6 bloques EXCEPT), y la presente sección §8 del informe |
+| **Qué se aceptó** | La estructura de los requisitos EARS/INCOSE, las definiciones SQL de las tres vistas y los bloques de verificación de equivalencia |
+| **Qué se modificó o descartó, y por qué** | Se ajustó la justificación del criterio de seguridad en `vw_pedidos_cliente`: dado que la tabla `cliente` del esquema actual no tiene columna `contrasena`, se documentó el patrón con `email` y `telefono` y se incluyó una nota explícita sobre cómo extenderlo si se agrega una columna de autenticación en el futuro |
+| **Verificación realizada** | Contraste de columnas expuestas vs. esquema en `schema.sql`; revisión de que los `EXCEPT` cubren exactamente las mismas columnas que las vistas definen |
+
+---
+
+## 9. TP3 Parte C — Vista materializada mv_facturacion_categoria_mes
+
+**Fecha:** 05/09/2026  
+**Entregables asociados:** `TP3/materializadas.sql` · `Proyecto_Integrador/database/materializadas.sql` · `Proyecto_Integrador/specs/spec_punto_4.3/requirements.md`
+
+---
+
+### 9.1 Descripción del reporte elegido
+
+El reporte consolida la **facturación histórica por categoría y mes** a partir de los subtotales de `pedido_detalle`. La consulta subyacente es costosa por diseño:
+
+* **4 JOINs:** `pedido_detalle pd JOIN pedido p ON pd.pedido_id = p.id`, `pedido_detalle pd JOIN producto pr ON pd.producto_id = pr.id`, `producto pr JOIN categoria c ON pr.categoria_id = c.id` (`materializadas.sql:31-34`).
+* **Agregaciones:** `SUM(pd.subtotal)` (facturación total) y `COUNT(DISTINCT p.id)` (pedidos distintos) sobre ~621 199 filas en `pedido_detalle` y ~50 005 productos.
+* **Agrupación temporal:** `DATE_TRUNC('month', p.fecha)` para bucket mensual + `c.nombre` para dimensión categoría.
+* **Orden:** `ORDER BY mes DESC, facturacion_total DESC` para exponer primero el mes más reciente y dentro de cada mes la categoría de mayor facturación.
+
+Este patrón corresponde a un `Reporte_de_Gestión` (cierre mensual, análisis de tendencias) y no a un `Dashboard_Tiempo_Real`: el usuario acepta latencia a cambio de respuesta en milisegundos sin recalcular JOINs en cada consulta.
+
+---
+
+### 9.2 SQL de la vista materializada y su índice
+
+#### 9.2.1 Vista materializada (`materializadas.sql:37-55` — Requisito 1)
+
+```sql
+CREATE MATERIALIZED VIEW mv_facturacion_categoria_mes AS
+SELECT
+    c.nombre                              AS categoria,
+    DATE_TRUNC('month', p.fecha)          AS mes,
+    COUNT(DISTINCT p.id)                  AS total_pedidos,
+    SUM(pd.subtotal)                      AS facturacion_total
+FROM pedido_detalle pd
+JOIN pedido    p  ON pd.pedido_id    = p.id
+JOIN producto  pr ON pd.producto_id  = pr.id
+JOIN categoria c  ON pr.categoria_id = c.id
+GROUP BY c.nombre, DATE_TRUNC('month', p.fecha)
+ORDER BY mes DESC, facturacion_total DESC
+WITH DATA;
+```
+
+* **Tipo de objeto:** `MATERIALIZED VIEW` — almacena físicamente el resultado en disco (`Vista_Materializada`).
+* **Cláusula `WITH DATA`:** La vista queda poblada inmediatamente al crearse (Requisito 1.2). La alternativa `WITH NO DATA` exigiría un `REFRESH` antes del primer `SELECT`.
+* **Columnas exactas:** `categoria`, `mes`, `total_pedidos`, `facturacion_total` (Requisito 1.3).
+* **Comportamiento en lectura:** `SELECT * FROM mv_facturacion_categoria_mes` lee páginas materializadas sin re-ejecutar los 4 JOINs ni la agregación (Requisito 1.6).
+
+#### 9.2.2 Índice UNIQUE (`materializadas.sql:68-71` — Requisito 2)
+
+```sql
+CREATE UNIQUE INDEX idx_mv_facturacion_categoria_mes
+    ON mv_facturacion_categoria_mes (categoria, mes);
+-- Prerrequisito técnico de REFRESH CONCURRENTLY: sin este índice UNIQUE
+-- PostgreSQL no permite REFRESH MATERIALIZED VIEW CONCURRENTLY (requiere
+-- al menos un índice único para refrescar sin bloqueo exclusivo).
+-- No es un índice de búsqueda primario.
+```
+
+* **Nombre:** `idx_mv_facturacion_categoria_mes` (Requisito 2.3).
+* **Columnas:** `(categoria, mes)` — el `GROUP BY` garantiza una fila por par, por lo que la unicidad es esperable; si no lo fuera, el `CREATE INDEX` fallaría con violación de unicidad (Requisito 2.4), señalando error en la definición.
+* **Propósito:** Habilita `REFRESH MATERIALIZED VIEW CONCURRENTLY mv_facturacion_categoria_mes` sin adquirir bloqueo exclusivo, permitiendo lecturas simultáneas durante el refresco (Requisito 2.2).
+
+---
+
+### 9.3 Medición comparativa de rendimiento (Requisito 3)
+
+#### 9.3.1 Metodología
+
+Dos bloques `EXPLAIN (ANALYZE, BUFFERS)` incluidos en `materializadas.sql`:
+
+* **Bloque ANTES** (`materializadas.sql:12-26`): `Consulta_Original` con 4 JOINs + agregación, ejecutado **antes** de crear la vista.
+* **Bloque DESPUÉS** (`materializadas.sql:84-85`): `SELECT * FROM mv_facturacion_categoria_mes`, ejecutado **después** de crear la vista + índice.
+
+Ambos registran `Planning Time` y `Execution Time` y método de acceso.
+
+#### 9.3.2 Resultados
+
+**Fuente:** `anotaciones_vistas_materializadas.txt` — `EXPLAIN (ANALYZE, BUFFERS)` ejecutados sobre base poblada (621 199 filas en `pedido_detalle`, 200 000 pedidos, 50 005 productos, 3 categorías). Volumen representativo del dataset completo (Requisito 3.5).
+
+**Plan ANTES — Consulta Original:**
+
+```
+Incremental Sort  (cost=66612.59..154189.05 rows=132120 width=226) (actual time=735.005..752.928 rows=24 loops=1)
+  Sort Key: (date_trunc('month'::text, p.fecha)) DESC, (sum(pd.subtotal)) DESC
+  Presorted Key: (date_trunc('month'::text, p.fecha))
+  Full-sort Groups: 1  Sort Method: quicksort  Average Memory: 26kB  Peak Memory: 26kB
+  Buffers: shared hit=6894 read=1568, temp read=3170 written=3179
+  ->  GroupAggregate  (cost=66377.84..146920.49 rows=132120 width=226) (actual time=466.000..752.884 rows=24 loops=1)
+        Group Key: (date_trunc('month'::text, p.fecha)), c.nombre
+        Buffers: shared hit=6891 read=1568, temp read=3170 written=3179
+        ->  Gather Merge  (cost=66377.84..138726.70 rows=621199 width=201) (actual time=462.585..636.465 rows=621199 loops=1)
+              Workers Planned: 2  Workers Launched: 2
+              Buffers: shared hit=6891 read=1568, temp read=3170 written=3179
+              ->  Sort  (cost=65377.81..66024.90 rows=258833 width=201) (actual time=425.901..471.694 rows=207066 loops=3)
+                    Sort Key: (date_trunc('month'::text, p.fecha)) DESC, c.nombre, p.id
+                    Sort Method: external merge  Disk: 8880kB
+                    Buffers: shared hit=6891 read=1568, temp read=3170 written=3179
+                    ->  Hash Join  (cost=5973.29..16448.08 rows=258833 width=201) (actual time=31.122..200.333 rows=207066 loops=3)
+                          Hash Cond: (pr.categoria_id = c.id)
+                          ->  Hash Join  (cost=5955.19..15095.46 rows=258833 width=31) (actual time=30.721..136.142 rows=207066 loops=3)
+                                Hash Cond: (pd.producto_id = pr.id)
+                                ->  Parallel Hash Join  (cost=4314.08..12774.85 rows=258833 width=31) (actual time=17.799..88.024 rows=207066 loops=3)
+                                      Hash Cond: (pd.pedido_id = p.id)
+                                      ->  Parallel Seq Scan on pedido_detalle pd  (cost=0.00..7781.33 rows=258833 width=23) (actual time=0.057..12.942 rows=207066 loops=3)
+                                            Buffers: shared hit=3625 read=1568
+                                      ->  Parallel Hash  (cost=2843.48..2843.48 rows=117648 width=16) (actual time=17.361..17.361 rows=66667 loops=3)
+                                            ->  Parallel Seq Scan on pedido p  (cost=0.00..2843.48 rows=117648 width=16) (actual time=0.010..6.156 rows=66667 loops=3)
+                                ->  Hash  (cost=1016.05..1016.05 rows=50005 width=16) (actual time=12.721..12.721 rows=50005 loops=3)
+                                      ->  Seq Scan on producto pr  (cost=0.00..1016.05 rows=50005 width=16)
+                          ->  Hash  (cost=13.60..13.60 rows=360 width=186) (actual time=0.382..0.382 rows=3 loops=3)
+                                ->  Seq Scan on categoria c  (cost=0.00..13.60 rows=360 width=186)
+Planning Time: 67.035 ms
+Execution Time: 760.827 ms
+```
+
+**Plan DESPUÉS — SELECT sobre la vista materializada:**
+
+```
+Seq Scan on mv_facturacion_categoria_mes  (cost=0.00..1.24 rows=24 width=226) (actual time=0.009..0.010 rows=24 loops=1)
+  Buffers: shared hit=1
+Planning:
+  Buffers: shared hit=21 read=1 dirtied=3
+Planning Time: 1.567 ms
+Execution Time: 0.020 ms
+```
+
+**Tabla comparativa:**
+
+| Métrica | Consulta Original (4 JOINs + agregación) | `SELECT * FROM mv_facturacion_categoria_mes` | Δ |
+|---|---|---|---|
+| **Método de acceso** | Incremental Sort → GroupAggregate → Gather Merge (2 workers) → Sort (external merge Disk 8880kB) → Hash Join ×3 → Parallel Seq Scan | Seq Scan sobre `mv_facturacion_categoria_mes` (páginas materializadas) | Eliminación completa de JOINs y sorts |
+| **Cost estimado** | 66612.59..154189.05 | 0.00..1.24 | **−99.99 %** |
+| **Rows** | 621 199 leídas / 24 agrupadas (3 categorías × 8 meses aprox.) | 24 filas materializadas | 1 fila por par `(categoria, mes)` |
+| **Planning Time** | 67.035 ms | 1.567 ms | **−65.468 ms (−97.7 %)** |
+| **Execution Time** | 760.827 ms | 0.020 ms | **−760.807 ms (~38 041× más rápido)** |
+| **Buffers shared** | hit=6894 read=1568 | hit=1 (data) + hit=21 read=1 dirtied=3 (planning) | −99.98 % |
+| **Buffers temp** | read=3170 written=3179 (sort externo en disco) | 0 | Eliminación de I/O temporal |
+| **Volumen** | 621 199 filas `pedido_detalle` + 200 000 `pedido` + 50 005 `producto` | 24 filas materializadas | Dataset completo, representativo |
+
+#### 9.3.3 Análisis
+
+El `Execution Time` del `SELECT` sobre la vista es **760.827 ms → 0.020 ms (~38 000× más rápido)**, confirmando la hipótesis del Requisito 3.3. La Consulta Original paga 4 JOINs hasheados, 2 sorts (uno con `external merge` de 8880 kB en disco y `temp read/written 3170/3179`) y un `Gather Merge` paralelo sobre 621 199 filas. La vista materializada lo reemplaza por un único `Seq Scan` sobre 24 filas ya agregadas en disco (`Buffers: shared hit=1`), sin `temp` y con `Planning Time` reducido de 67.035 ms a 1.567 ms (−97.7 %).
+
+El `cost` cae de ~154k a 1.24 y el I/O de 6894+1568 páginas a 1 página, lo que cuantifica el beneficio de la materialización. A mayor `pedido_detalle`, mayor brecha: el costo de la consulta original crece linealmente mientras que el de la vista permanece constante (una fila por mes-categoría). La medición es representativa del dataset completo y documenta el caso exitoso complementario al §2-§6 (donde dos de tres índices fueron ignorados o marginales): aquí la materialización sí produce mejora de tres órdenes de magnitud.
+
+---
+
+### 9.4 Justificación de la frecuencia de refresco y latencia (Requisito 4)
+
+#### 9.4.1 Frecuencia propuesta: diaria (madrugada / cierre de jornada)
+
+Se propone **al menos 1 vez por día**, preferentemente durante la madrugada o al cierre de la jornada operativa (Requisito 4.1). Justificación:
+
+* El reporte consolida **facturación histórica de cierre de mes**: no requiere datos en tiempo real. Un corte diario es suficiente para decisiones de `Reporte_de_Gestión` (tendencias, comparativa intermensual, cierre contable).
+* Refrescar de madrugada minimiza contención con la carga OLTP diurna y aprovecha ventanas de baja actividad para re-ejecutar los 4 JOINs + agregación completa.
+
+#### 9.4.2 Latencia de dato
+
+Con refresco diario, la **Latencia_de_Dato máxima es de ~24 horas** (Requisito 4.2): transacciones insertadas en `pedido`/`pedido_detalle` después del último `REFRESH` no serán visibles en `mv_facturacion_categoria_mes` hasta el siguiente ciclo. Ejemplo: un pedido del 05/09 10:00 con refresco programado a las 04:00 aparecerá recién el 06/09 04:00.
+
+#### 9.4.3 Adecuación por tipo de consumidor
+
+| Consumidor | ¿Adecuada `mv_facturacion_categoria_mes`? | Motivo |
+|---|---|---|
+| `Reporte_de_Gestión` (cierre mensual, análisis de tendencias, decisiones comerciales) | **Sí** | Latencia de 24 h aceptable; beneficio de respuesta en ms |
+| `Dashboard_Tiempo_Real` / consultas transaccionales de ventas del momento | **No** | Requiere estado actual en segundos/minutos; la vista estaría desactualizada |
+
+(Requisito 4.3)
+
+#### 9.4.4 Opción de refresco cada 4-6 horas en alta carga
+
+Si el sistema opera con alta inserción de pedidos durante la jornada comercial, puede evaluarse incrementar la frecuencia a **cada 4-6 horas** (Requisito 4.4). Trade-off a documentar:
+
+* **Beneficio:** Latencia baja a 4-6 h, reporte más fresco para seguimiento intradía.
+* **Costo:** Re-materializar los 4 JOINs + agregación completa sobre el volumen vigente consume CPU e I/O en cada ciclo; con ~621k filas el costo es moderado pero crece linealmente con el volumen. Medir `EXPLAIN (ANALYZE, BUFFERS)` del `REFRESH` para dimensionar ventana.
+
+#### 9.4.5 Comando de refresco concurrente
+
+```sql
+REFRESH MATERIALIZED VIEW CONCURRENTLY mv_facturacion_categoria_mes;
+```
+
+Ejecutable sin bloquear lecturas concurrentes gracias al índice `UNIQUE` (`materializadas.sql:90`). Programable vía `pg_cron` o script de mantenimiento nocturno (Requisito 4.5):
+
+```sql
+-- Ejemplo pg_cron (diario 04:00)
+SELECT cron.schedule('refresh-mv-facturacion', '0 4 * * *',
+  $$REFRESH MATERIALIZED VIEW CONCURRENTLY mv_facturacion_categoria_mes$$);
+```
+
+#### 9.4.6 Límite de frecuencia — cuándo deja de convenir la vista materializada
+
+Si se requiere refresco con intervalo **< 1 hora**, evaluar si la vista materializada sigue siendo la herramienta adecuada (Requisito 4.6): el costo de re-ejecutar la agregación completa cada pocos minutos puede superar el beneficio, y conviene considerar alternativas como vista ordinaria con índices optimizados sobre `pedido(fecha)` / `pedido_detalle(producto_id)`, o una tabla de agregados mantenida por triggers / `pg_ivm`.
+
+---
+
+### 9.5 Tabla resumen de entregables del punto 4.3
+
+| Entregable | Ruta | Contenido |
+|---|---|---|
+| Vista materializada + índice + bloques EXPLAIN | `TP3/materializadas.sql` | `CREATE MATERIALIZED VIEW ... WITH DATA` + `CREATE UNIQUE INDEX idx_mv_facturacion_categoria_mes` + 2 bloques `EXPLAIN (ANALYZE, BUFFERS)` + comando `REFRESH CONCURRENTLY` comentado |
+| Copia espejo (Proyecto Integrador) | `Proyecto_Integrador/database/materializadas.sql` | Idéntico a `TP3/materializadas.sql` |
+| Informe de mediciones — Sección §9 | `TP3/informe_mediciones.md` (§9) | Descripción del reporte, SQL, tabla comparativa, justificación de refresco, latencia, DUIA |
+| Spec de referencia | `Proyecto_Integrador/specs/spec_punto_4.3/requirements.md` | 5 requisitos EARS (Requisitos 1-5) |
+
+---
+
+### Nota — Declaración de Uso de IA (DUIA) — Parte C
+
+| Campo | Detalle |
+|---|---|
+| **Herramienta** | OpenCode (modelo `muse-spark-1.2-contributor-free`) |
+| **Qué generó** | `materializadas.sql` (vista `mv_facturacion_categoria_mes` con `WITH DATA` + índice `UNIQUE` + bloques `EXPLAIN (ANALYZE, BUFFERS)` + comando `REFRESH CONCURRENTLY`), y la presente sección §9 del informe |
+| **Qué se aceptó** | La definición SQL con los 4 JOINs exactos del spec, `GROUP BY`/`ORDER BY` especificados, `WITH DATA`, índice `UNIQUE (categoria, mes)` y la estructura de la sección §9 con sus 6 subsecciones |
+| **Qué se modificó o descartó, y por qué** | Sin descartes respecto al spec. Placeholders `[COMPLETAR CON VALOR REAL]` reemplazados por valores reales de `anotaciones_vistas_materializadas.txt` (Planning 67.035→1.567 ms, Execution 760.827→0.020 ms, Buffers y plan completo) |
+| **Verificación realizada** | Contraste de columnas/JOINs/`GROUP BY`/`ORDER BY`/`WITH DATA`/nombre de índice contra `requirements.md` Requisitos 1-2; verificación de los 2 bloques `EXPLAIN (ANALYZE, BUFFERS)` y su documentación en §9.3 con valores reales y volumen (621 199 filas); revisión de que §9 no modifica §§1-8 |
