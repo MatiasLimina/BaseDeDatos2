@@ -46,7 +46,7 @@ FROM generate_series(1, 20000) AS s(i);
 -- ---------------------------------------------------------------------
 INSERT INTO pedido (fecha, forma_pago, cliente_id)
 SELECT CURRENT_DATE - (random()*365)::int,
-       (ARRAY['EFECTIVO','TARJETA','TRANSFERENCIA']::forma_pago_enum)[floor(random()*3+1)],
+       (ARRAY['EFECTIVO'::forma_pago_enum,'TARJETA'::forma_pago_enum,'TRANSFERENCIA'::forma_pago_enum])[(floor(random()*3+1))::int],
        (SELECT id FROM cliente ORDER BY random() LIMIT 1)
 FROM generate_series(1, 200000) AS s(i);
 
@@ -78,3 +78,5 @@ ANALYZE producto;
 ANALYZE cliente;
 ANALYZE pedido;
 ANALYZE pedido_detalle;
+
+
