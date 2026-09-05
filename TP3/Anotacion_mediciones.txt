@@ -1,0 +1,52 @@
+Medir la consulta 1 sin índice (EXPLAIN ANALYZE "Antes"):
+-Parallel Seq Scan on pedido  (cost=0.00..3725.83 rows=1 width=36) (actual time=164.437..164.437 rows=0.00 loops=2)
+-Planning Time: 2.810 ms
+-Execution Time: 289.652 ms
+Medir la consulta 2 sin índice (EXPLAIN ANALYZE "Antes"):
+-  ->  Sort  (cost=19147.42..19272.43 rows=50005 width=30) (actual time=423.127..423.130 rows=5.00 loops=1)
+        Sort Method: top-N heapsort  Memory: 25kB
+        ->  HashAggregate  (cost=17816.81..18316.86 rows=50005 width=30) (actual time=422.929..423.075 rows=104.00 loops=1)
+              ->  Hash Join  (cost=1641.11..14701.19 rows=623124 width=26) (actual time=209.807..351.774 rows=621199.00 loops=1)
+                    ->  Seq Scan on pedido_detalle pd  (cost=0.00..11424.24 rows=623124 width=12) (actual time=0.028..27.892 rows=621199.00 loops=1)
+                    ->  Hash  (cost=1016.05..1016.05 rows=50005 width=22) (actual time=209.656..209.657 rows=50005.00 loops=1)
+                          ->  Seq Scan on producto p  (cost=0.00..1016.05 rows=50005 width=22) (actual time=0.011..199.901 rows=50005.00 loops=1)
+-Planning Time: 11.944 ms
+-Execution Time: 423.892 ms
+Medir la consulta 3 sin índice (EXPLAIN ANALYZE "Antes"):
+-  ->  Index Scan using pk_pedido_detalle on pedido_detalle  (cost=0.42..11.98 rows=3 width=34) (actual time=0.008..0.022 rows=1.00 loops=1)  ->  Index Scan using pk_pedido_detalle on pedido_detalle  (cost=0.42..11.98 rows=3 width=34) (actual time=0.008..0.022 rows=1.00 loops=1)
+-Planning Time: 0.156 ms
+-Execution Time: 0.055 ms
+Medir las escrituras masivas sin índices (INSERT "Antes"):
+-Execute time	0,313s
+Medir la consulta 1 con índice (EXPLAIN ANALYZE "Después"):
+-Index Scan using idx_pedido_fecha on pedido  (cost=0.29..8.32 rows=1 width=36) (actual time=0.004..0.004 rows=0.00 loops=1)
+-Planning Time: 1.669 ms
+-Execution Time: 0.018 ms
+Medir la consulta 2 con índice (EXPLAIN ANALYZE "Después"):
+-  ->  Sort  (cost=19113.49..19238.51 rows=50005 width=30) (actual time=217.593..217.595 rows=5.00 loops=1)
+                          ->  Seq Scan on producto p  (cost=0.00..1016.05 rows=50005 width=22) (actual time=0.006..4.030 rows=50005.00 loops=1)
+        ->  HashAggregate  (cost=17782.88..18282.93 rows=50005 width=30) (actual time=217.466..217.571 rows=104.00 loops=1)
+              ->  Hash Join  (cost=1641.11..14676.88 rows=621199 width=26) (actual time=10.037..146.291 rows=621199.00 loops=1)
+                    ->  Seq Scan on pedido_detalle pd  (cost=0.00..11404.99 rows=621199 width=12) (actual time=0.014..25.382 rows=621199.00 loops=1)
+                    ->  Hash  (cost=1016.05..1016.05 rows=50005 width=22) (actual time=9.931..9.931 rows=50005.00 loops=1)
+                          ->  Seq Scan on producto p  (cost=0.00..1016.05 rows=50005 width=22) (actual time=0.006..4.030 rows=50005.00 loops=1)
+-Planning Time: 0.179 ms
+-Execution Time: 218.262 ms
+Medir la consulta 3 con índice (EXPLAIN ANALYZE "Después"):
+-Index Scan using idx_detalle_subtotal on pedido_detalle  (cost=0.42..11.98 rows=3 width=34) (actual time=0.087..0.088 rows=1.00 loops=1)
+-Planning Time: 0.097 ms
+-Execution Time: 0.102 ms
+Medir el costo en escrituras con índices (INSERT "Después"):
+Execute time	0,058s
+
+
+
+Índice descartado por sobreindexación:
+
+    Objeto analizado: ON pedido(forma_pago)
+
+    Decisión: Descartado.
+
+    Justificación técnica: Se analizó la propuesta de indexar la columna forma_pago. Se descarta debido a su baja cardinalidad (cuenta con únicamente 4 valores posibles en el dominio del negocio). Crear un índice en estas condiciones resulta ineficiente porque PostgreSQL descartará su uso y optará por un Seq Scan ante consultas generales, sumando un costo innecesario de mantenimiento en cada operación de escritura (INSERT/UPDATE) sin aportar mejoras en el rendimiento de lectura.
+
+Registro duia.md respecto a la sobreindexacion: la IA sugerio este índice pero por criterio técnico fue descartado.
