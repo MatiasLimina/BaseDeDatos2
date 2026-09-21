@@ -122,11 +122,20 @@ CREATE TABLE pedido_detalle (
 );
 
 -- ---------------------------------------------------------------------
--- 7. Índices Justificados
+-- 7. Índices Justificados y Optimización de Borrado Lógico (Soft Delete)
 -- ---------------------------------------------------------------------
 
 -- Índice 1: Acelera la búsqueda de todos los pedidos realizados por un cliente específico.
 CREATE INDEX idx_pedido_cliente_id ON pedido(cliente_id);
 
--- Índice 2: Acelera el listado y filtrado de productos vigentes (activos) dentro de una categoría.
-CREATE INDEX idx_producto_categoria_activo ON producto(categoria_id, activo);
+-- Índice 2 (Índice Parcial): Acelera el catálogo y consultas frecuentes sobre productos
+-- vigentes (operativos), omitiendo del árbol B-tree a los productos dados de baja lógica (activo = FALSE).
+-- Reduce el tamaño del índice en disco/RAM y optimiza el acceso para la vista vw_productos_vigentes.
+CREATE INDEX idx_producto_categoria_precio_activo 
+    ON producto(categoria_id, precio) 
+    WHERE activo = TRUE;
+
+-- Índice 3 (Índice Parcial para Clientes Activos): Optimiza la búsqueda de clientes habilitados
+CREATE INDEX idx_cliente_activo_email 
+    ON cliente(email) 
+    WHERE activo = TRUE;
