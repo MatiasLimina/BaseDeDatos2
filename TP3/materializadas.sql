@@ -1,9 +1,10 @@
 -- =====================================================================
--- Proyecto Integrador: Food Store (TP3 — Punto 4.3)
+-- Base de Datos II — Trabajo Práctico Unidad 3 (Food Store)
 -- Archivo: materializadas.sql
--- Motor: PostgreSQL
+-- Integrantes: Matías Limina, Nicolás Monjelardi, Lautaro Agüero
+-- Motor: PostgreSQL 16+
+-- Repositorio: https://github.com/MatiasLimina/BaseDeDatos2.git
 -- Descripción: Vista materializada de facturación por categoría y mes
--- Spec:  Proyecto_Integrador/specs/spec_punto_4.3/requirements.md
 -- =====================================================================
 
 -- ---------------------------------------------------------------------

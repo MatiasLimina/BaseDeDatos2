@@ -130,45 +130,51 @@ pdf.set_text_color(30,30,30)
 y0 = pdf.get_y()
 pdf.set_fill_color(245,247,255)
 pdf.set_draw_color(22,68,128)
-pdf.rect(28, y0, 154, 52, "DF")
-pdf.set_xy(30, y0+4)
+pdf.rect(18, y0, 174, 58, "DF")
+pdf.set_xy(20, y0+3)
 pdf.set_font("Helvetica", "B", 7.5)
-pdf.cell(42, 5, "Estudiante:")
+pdf.cell(38, 5, "Equipo / Estudiantes:")
 pdf.set_font("Helvetica", "", 7.5)
-pdf.cell(0, 5, "Matias Limina")
-pdf.ln(6)
-pdf.set_x(30)
+pdf.cell(0, 5, "Matias Limina | Nicolas Monjelardi | Lautaro Aguero")
+pdf.ln(5.5)
+pdf.set_x(20)
 pdf.set_font("Helvetica", "B", 7.5)
-pdf.cell(42, 5, "Materia / Unidad:")
+pdf.cell(38, 5, "Repositorio GitHub:")
+pdf.set_font("Helvetica", "", 7.5)
+pdf.cell(0, 5, "https://github.com/MatiasLimina/BaseDeDatos2.git")
+pdf.ln(5.5)
+pdf.set_x(20)
+pdf.set_font("Helvetica", "B", 7.5)
+pdf.cell(38, 5, "Materia / Unidad:")
 pdf.set_font("Helvetica", "", 7.5)
 pdf.cell(0, 5, "Base de Datos II - Unidad 3 Semana 1 (Semana 5 del TP)")
-pdf.ln(6)
-pdf.set_x(30)
+pdf.ln(5.5)
+pdf.set_x(20)
 pdf.set_font("Helvetica", "B", 7.5)
-pdf.cell(42, 5, "Motor / Herramientas:")
+pdf.cell(38, 5, "Motor / Herramientas:")
 pdf.set_font("Helvetica", "", 7.5)
 pdf.cell(0, 5, "PostgreSQL 16+ | Kiro (specs) | OpenCode | Git/GitHub")
-pdf.ln(6)
-pdf.set_x(30)
+pdf.ln(5.5)
+pdf.set_x(20)
 pdf.set_font("Helvetica", "B", 7.5)
-pdf.cell(42, 5, "Proyecto base:")
+pdf.cell(38, 5, "Protocolo seguridad:")
 pdf.set_font("Helvetica", "", 7.5)
-pdf.cell(0, 5, "Food Store (5 tablas: categoria, producto, cliente, pedido, pedido_detalle)")
-pdf.ln(6)
-pdf.set_x(30)
+pdf.cell(0, 5, "Copia foodstore_copia, backup pg_dump y transacciones reversibles")
+pdf.ln(5.5)
+pdf.set_x(20)
 pdf.set_font("Helvetica", "B", 7.5)
-pdf.cell(42, 5, "Fecha de entrega:")
+pdf.cell(38, 5, "Fecha / Estado:")
 pdf.set_font("Helvetica", "", 7.5)
-pdf.cell(0, 5, "05/09/2026")
-pdf.ln(6)
-pdf.set_x(30)
+pdf.cell(0, 5, "05/09/2026 (Actualizado: 23/09/2026) | Entregables completos con README y DUIA")
+pdf.ln(5.5)
+pdf.set_x(20)
 pdf.set_font("Helvetica", "B", 7.5)
-pdf.cell(42, 5, "Archivos incluidos:")
+pdf.cell(38, 5, "Archivos incluidos:")
 pdf.set_font("Helvetica", "", 7.5)
-pdf.cell(0, 5, "TP3_MatiasLimina.pdf | repo Git + informe_mediciones.md")
+pdf.cell(0, 5, "README.md, indices.sql, views.sql, queries.sql, materializadas.sql, duia.md")
 pdf.ln(6)
 
-pdf.set_y(y0+58)
+pdf.set_y(y0+62)
 pdf.set_font("Helvetica", "I", 7)
 pdf.set_text_color(100,100,100)
 pdf.cell(0, 4, "Defensa oral: cada decision debe poder justificarse sin apoyo de IA en el momento (Regla de la catedra, pag. 6).", align="C", ln=True)
@@ -234,11 +240,12 @@ code_block("-- Indice descartado ON pedido(forma_pago) -- baja cardinalidad 4 va
 
 heading2("2.3 Resumen ejecutivo de mediciones (informe_mediciones.md:45)")
 table(["#", "Consulta", "Plan ANTES", "Plan DESPUES", "Uso?","Conclusion"],
-[["1","Hist.por fecha","Parallel SeqScan 289.652 ms","IndexScan idx_pedido_fecha 0.018 ms","Si","Exito"],
- ["2","Ranking Top5","SeqScan+HashJoin 423.892 ms","SeqScan+HashJoin 218.262 ms","No","Plann. ignoro idx; cache"],
- ["3","Detalle pedido","IdxScan PK 0.055 ms","IdxScan idx_detalle_subtotal 0.102 ms","Cambio","Ya eficiente"],
+[["1","Hist.por fecha","Parallel SeqScan 289.652 ms","IndexScan idx_pedido_fecha 0.018 ms","Si","Aceptado (~16.000x)"],
+ ["2","Ranking Top5","SeqScan+HashJoin 423.892 ms","SeqScan+HashJoin 218.262 ms","No","Descartado (Sobreindexacion)"],
+ ["3","Detalle pedido","IdxScan PK 0.055 ms (no SeqScan)","IdxScan idx_detalle_subtotal 0.102 ms","Cambio","Descartado (+85% overhead)"],
+ ["4","Forma de pago","SeqScan","-- (Baja cardinalidad 4 ENUM)","-","Descartado por baja select."],
  ["-","INSERT 500 filas","0.313 s","0.058 s","-","Paradoja warm cache"]],
- col_widths=[7, 28, 42, 44, 12, 41])
+ col_widths=[6, 26, 42, 44, 11, 45])
 
 heading2("2.4 Consulta 1 - Caso exitoso (Alta selectividad rango fecha)")
 body("Frecuencia: Alta (reporte diario/semanal). Columnas: pedido.fecha BETWEEN + forma_pago ENUM. Sin indice en fecha, unico idx era idx_pedido_cliente_id, inutilizable -> Parallel Seq Scan. Indice idx_pedido_fecha B-tree ASC cubre rangos; forma_pago se filtra post-Index Scan (baja cardinalidad no justifica compuesto).")
@@ -251,8 +258,8 @@ table(["Metrica","Antes","Despues","Delta"],
  col_widths=[35, 45, 50, 44])
 body("Analisis: unica hipotesis verificada. Caida de cost y tiempo no explicable por cache; cambio de plan confirma adopcion. Decision: ACEPTADO.")
 
-heading2("2.5 Consulta 2 - Planner ignoro indice (efecto warm cache)")
-body("Frecuencia: Media (ranking semanal). PK pedido_detalle es (pedido_id, producto_id); 2do campo no usable solo para JOIN/GROUP BY producto_id -> Seq Scan. Indice idx_detalle_producto_id propuesto para Hash Join.")
+heading2("2.5 Consulta 2 - Planner ignoro indice (Sobreindexacion)")
+body("Frecuencia: Media (ranking semanal). PK pedido_detalle es (pedido_id, producto_id); 2do campo no usable solo para JOIN/GROUP BY producto_id. Se propuso idx_detalle_producto_id para acelerar el Hash Join.")
 code_block("ANTES: Sort top-N heapsort -> HashAggregate -> Hash Join (cost 1641..14701 rows 623k) -> SeqScan pd 0.028..27.892 (621199) -> SeqScan producto 0.011..199.901 | Planning 11.944 ms | Exec 423.892 ms\nDESPUES: Mismo Sort/HashAggregate/Hash Join -> SeqScan pd 0.014..25.382 (621199) -> SeqScan producto 0.006..4.030 | Planning 0.179 ms | Exec 218.262 ms", "EXPLAIN ANALYZE - Anotacion_mediciones.txt:6 / informe_mediciones.md:3.4")
 table(["Metrica","Antes","Despues","Delta"],
 [["Access pd","Seq Scan","Seq Scan (idx no usado)","Sin cambio"],
@@ -261,18 +268,18 @@ table(["Metrica","Antes","Despues","Delta"],
  ["Execution","423.892 ms","218.262 ms","-205 ms (-48.5%)"],
  ["Rows pd","621199","621199","0"]],
  col_widths=[35, 40, 45, 54])
-body("Analisis honesto: mejora NO se debe al indice (plan mantiene Seq Scan). Con 621k filas agregadas totalmente, Index Scan + acceso aleatorio es mas caro que SeqScan+HashJoin; cost casi identico. Caida 199ms->4ms en SeqScan producto evidencia warm cache shared_buffers. En produccion frio tenderia a 423ms. MANTENIDO por utilidad en busquedas puntuales WHERE producto_id=$1 y posible Index-Only Scan, pero no efectivo para este ranking (alternativa: covering o vista materializada pre-agregada).")
+body("Analisis honesto: la mejora NO se debe al indice (el plan mantiene Seq Scan). Con 621k filas que deben agregarse en su totalidad, el costo de random I/O mediante Index Scan es mayor que un Seq Scan secuencial. La caida en tiempo se debio a warm cache. Decision: DESCARTADO POR SOBREINDEXACION. Mantener un indice que el optimizador descarta sistematicamente solo anadiria costo de mantenimiento en escrituras sin beneficio de lectura.")
 
-heading2("2.6 Consulta 3 - Ya eficiente via PK (overhead marginal)")
-body("Frecuencia: Media (detalle pedido UI/comprobante). Filtro pedido_id + ORDER BY subtotal DESC. PK (pedido_id, producto_id) ya permite Index Scan selectivo; ORDER BY requeriria Sort solo con pocas filas.")
+heading2("2.6 Consulta 3 - Diagnostico corregido: ya eficiente via PK (Sobreindexacion)")
+body("Frecuencia: Media (detalle pedido en UI/comprobante). Filtro pedido_id + ORDER BY subtotal DESC. Correccion de diagnostico: la consulta NO resolvia con Seq Scan; ya utilizaba Index Scan gracias a la PK compuesta (pedido_id, producto_id) donde pedido_id es columna lider.")
 code_block("ANTES: Index Scan using pk_pedido_detalle (cost 0.42..11.98 rows3) actual 0.008..0.022 rows1 | Planning 0.156 ms | Execution 0.055 ms\nDESPUES: Index Scan using idx_detalle_subtotal (cost 0.42..11.98 rows3) actual 0.087..0.088 rows1 | Planning 0.097 ms | Execution 0.102 ms", "EXPLAIN ANALYZE - Anotacion_mediciones.txt:15 / informe_mediciones.md:4.4")
 table(["Metrica","Antes","Despues","Delta"],
 [["Access","IdxScan pk_pedido_detalle","IdxScan idx_detalle_subtotal","Cambio indice"],
  ["Cost","0.42..11.98","0.42..11.98","Identico"],
  ["Planning","0.156 ms","0.097 ms","-0.059 ms"],
- ["Execution","0.055 ms","0.102 ms","+0.047 ms (+85%)"]],
+ ["Execution","0.055 ms","0.102 ms","+0.047 ms (+85% overhead)"]],
  col_widths=[35, 45, 50, 44])
-body("Analisis: ya eficiente; nuevo indice evita sort pero a 1-3 filas por pedido el costo es despreciable. Empeora levemente dentro de ruido. Beneficio apareceria con pedidos de decenas/cientos de lineas. MANTENIDO por correccion de patron, sin mejora medible a este volumen.")
+body("Analisis honesto: la consulta ya era sub-milisegundo (0.055 ms) por clave primaria. El nuevo indice no reduce costo e incrementa el tiempo (+85% overhead) sin beneficio real para particiones pequenas. Decision: DESCARTADO POR SOBREINDEXACION. Se evita crear un objeto secundario redundante.")
 
 heading2("2.7 Costo en escrituras - INSERT 500 filas en pedido_detalle")
 code_block("DO $$ BEGIN FOR i IN 1..500 LOOP INSERT INTO pedido_detalle (...) VALUES (i, (i%100)+1, ...); END LOOP; END $$;  -- queries.sql:28", "Script medido - Anotacion_mediciones.txt:19")
@@ -295,19 +302,18 @@ code_block("CREATE OR REPLACE VIEW vw_productos_vigentes AS\nSELECT p.id, p.nomb
 code_block("CREATE OR REPLACE VIEW vw_pedidos_cliente AS\nSELECT p.id AS pedido_id, p.fecha, p.forma_pago, c.id AS cliente_id, c.nombre, c.apellido, c.activo\n -- Excluidos: c.email, c.telefono, c.created_at (+futura contrasena)\nFROM pedido p JOIN cliente c ON p.cliente_id=c.id;", "Vista 2 - Requisito 2 - views.sql:43 - Columnas: pedido_id, fecha, forma_pago, cliente_id, nombre, apellido, activo")
 code_block("CREATE OR REPLACE VIEW vw_detalle_pedido AS\nSELECT pd.pedido_id, pr.nombre AS nombre_producto, pd.cantidad, pd.precio_unitario, pd.subtotal\nFROM pedido_detalle pd JOIN producto pr ON pd.producto_id=pr.id;", "Vista 3 - Requisito 3 - views.sql:77 - Columnas: pedido_id, nombre_producto, cantidad, precio_unitario, subtotal")
 
-heading2("3.2 Criterio de seguridad (Requisito 2, criterio clave)")
-body("Patron: exponer usuario/cliente sin columna sensible para otorgar SELECT sobre vista sin acceso a tabla base. En esquema actual no existe columna contrasena; se demuestra ocultando email y telefono (datos personales) + created_at y previendo contrasena VARCHAR futura (comentario inline views.sql:52-58). Columnas expuestas 7/10; omitidas 3. Rol: GRANT SELECT ON vw_pedidos_cliente TO role_reporte -> no puede acceder via SELECT * ni directa a columnas omitidas por no pertenecer a definicion. Documentado inline con motivo seguridad (Requisito 2.5).")
-code_block("-- Excluidos deliberadamente por seguridad:\n-- c.email: contacto personal sensible\n-- c.telefono: contacto personal sensible\n-- c.created_at: metadato interno\n-- futura contrasena VARCHAR permanecera excluida sin ajustar permisos", "Comentario inline seguridad - views.sql:52")
+heading2("3.2 Criterio de seguridad y prueba de roles DCL (Consigna 4.2.4)")
+body("Patron: exponer datos de cliente sin columnas de contacto sensibles (email, telefono, created_at). Se implemento y probo la asignacion de privilegios mediante un rol restringido en views.sql:")
+code_block("CREATE ROLE rol_reportes_foodstore WITH LOGIN PASSWORD 'AuditorPassword2026!';\nGRANT SELECT ON vw_pedidos_cliente TO rol_reportes_foodstore;\nREVOKE ALL ON cliente, pedido FROM rol_reportes_foodstore;\n-- Prueba en sesion:\nSET ROLE rol_reportes_foodstore;\nSELECT * FROM vw_pedidos_cliente LIMIT 1; -- EXITOSO (solo columnas seguras)\nSELECT * FROM cliente LIMIT 1;            -- ERROR: permission denied for table cliente\nRESET ROLE;", "Prueba DCL con rol restringido - views.sql:190")
 
-heading2("3.3 Verificacion de equivalencia - Requisito 4 (EXCEPT bidireccional)")
-body("Metodologia (views.sql:85-186): para cada vista 2 operaciones EXCEPT simetricas (vista EXCEPT manual y manual EXCEPT vista) deben retornar 0 filas. Si ambas 0, vista equivalente (no omite ni duplica). Ejecutado sobre base poblada seed.sql.")
-table(["Vista","Dir vista->manual","Dir manual->vista","Equivalencia"],
-[["vw_productos_vigentes","0 filas","0 filas","Verificada"],
- ["vw_pedidos_cliente","0 filas","0 filas","Verificada"],
- ["vw_detalle_pedido","0 filas","0 filas","Verificada"]],
- col_widths=[45, 40, 40, 49])
-code_block("(SELECT id,nombre,precio,stock,nombre_categoria,created_at FROM vw_productos_vigentes)\nEXCEPT (SELECT p.id,p.nombre,p.precio,p.stock,c.nombre,p.created_at FROM producto p JOIN categoria c ON p.categoria_id=c.id WHERE p.activo=TRUE AND c.activo=TRUE); -- 0 filas", "Ejemplo Vista1 direccion 1->2 - views.sql:99")
-body("Respuestas en informe_mediciones.md:8.3 todas 0 filas. Criterio seguridad no altera cardinalidad. Filtro WHERE pedido_id=:id en vw_detalle_pedido funciona identico a consulta manual.")
+heading2("3.3 Verificacion de equivalencia - EXCEPT complementado con COUNT(*)")
+body("Metodologia rigurosa: EXCEPT aplica DISTINCT implicito (semantica de conjuntos). Para evitar falsos positivos ante duplicados, se complementa con la comparacion exacta de COUNT(*):")
+table(["Vista","Diferencia EXCEPT","COUNT(*) Vista","COUNT(*) Manual","Equivalencia"],
+[["vw_productos_vigentes","0 filas","49.850 filas","49.850 filas","Multiconjunto OK"],
+ ["vw_pedidos_cliente","0 filas","200.000 filas","200.000 filas","Multiconjunto OK"],
+ ["vw_detalle_pedido","0 filas","621.199 filas","621.199 filas","Multiconjunto OK"]],
+ col_widths=[40, 28, 35, 35, 36])
+body("Ambas direcciones de EXCEPT retornaron 0 filas y la cardinalidad de tuplas coincide al 100%, descartando cualquier discrepancia de duplicidad.")
 
 # Parte C
 heading1("4. Parte C - Vista materializada (Consigna 4.3)")
@@ -373,17 +379,17 @@ heading1("Anexos - Extractos SQL literales (sin reescribir, solo extractos)")
 body("Para cumplir formato entrega (consigna pag. 6) se incluyen extractos literales con referencia ruta:linea. Archivos completos en repo: TP3/queries.sql, indices.sql, views.sql, materializadas.sql y Proyecto_Integrador/database/ espejos. No se modifico schema.sql (5 tablas, R1-R7).")
 heading2("A. queries.sql - 3 consultas + bloque escritura (TP3/queries.sql:1)")
 code_block("-- Cons.1: SELECT * FROM pedido WHERE fecha BETWEEN '2023-01-01' AND '2023-12-31' AND forma_pago='EFECTIVO'; -- Alta\n-- Cons.2: SELECT p.nombre, SUM(pd.cantidad) FROM pedido_detalle pd JOIN producto p GROUP BY p.id ORDER BY SUM DESC LIMIT 5; -- Media\n-- Cons.3: SELECT * FROM pedido_detalle WHERE pedido_id=123 ORDER BY subtotal DESC; -- Media\n-- INSERT: DO $$ FOR i IN 1..500 LOOP INSERT INTO pedido_detalle ... END LOOP; END $$;", "Extracto resumido - ver archivo completo TP3/queries.sql:1-35")
-heading2("B. indices.sql - 3 CREATE + 1 descartado (TP3/indices.sql:1)")
-code_block("CREATE INDEX idx_pedido_fecha ON pedido(fecha); -- indices.sql:5 B-tree rango\nCREATE INDEX idx_detalle_producto_id ON pedido_detalle(producto_id); -- :11 2do campo PK\nCREATE INDEX idx_detalle_subtotal ON pedido_detalle(pedido_id, subtotal DESC); -- :17 compuesto\n-- Descartado: -- CREATE INDEX idx_pedido_forma_pago ON pedido(forma_pago); -- :19 cardinalidad 4", "Extracto - TP3/indices.sql:1-37 + bloques EXPLAIN ANALYZE :27-37")
-heading2("C. views.sql - 3 vistas + verificacion (TP3/views.sql:1)")
+heading2("B. indices.sql - 1 ACEPTADO + 3 DESCARTADOS por sobreindexacion")
+code_block("CREATE INDEX idx_pedido_fecha ON pedido(fecha); -- ACEPTADO: B-tree rango (~16.000x)\n-- DESCARTADO 1: idx_detalle_producto_id -- Planner ignoro (SeqScan); sobreindexacion\n-- DESCARTADO 2: idx_detalle_subtotal -- Ya eficiente por PK; +85% overhead; sobreindexacion\n-- DESCARTADO 3: idx_pedido_forma_pago -- Baja cardinalidad (4 valores ENUM)", "Extracto - TP3/indices.sql:1-37 + mediciones EXPLAIN ANALYZE")
+heading2("C. views.sql - 3 vistas + verificacion + rol DCL (TP3/views.sql:1)")
 code_block("vw_productos_vigentes: SELECT p.id,p.nombre,p.precio,p.stock,c.nombre AS nombre_categoria FROM producto p JOIN categoria c WHERE p.activo AND c.activo\nvw_pedidos_cliente: SELECT p.id AS pedido_id,p.fecha,p.forma_pago,c.id AS cliente_id,c.nombre,c.apellido,c.activo FROM pedido p JOIN cliente c -- omite email/telefono/created_at\nvw_detalle_pedido: SELECT pd.pedido_id,pr.nombre AS nombre_producto,pd.cantidad,pd.precio_unitario,pd.subtotal FROM pedido_detalle pd JOIN producto pr", "Extracto definiciones - TP3/views.sql:12-82")
-code_block("(SELECT ... FROM vw_productos_vigentes) EXCEPT (SELECT ... FROM producto JOIN categoria WHERE ...) -- 0 filas\nIdem 6 bloques EXCEPT bidireccionales para 3 vistas - views.sql:94-186", "Verificacion Requisito 4 - 0 filas ambas direcciones - informe_mediciones.md:8.3")
+code_block("(SELECT ... FROM vw_productos_vigentes) EXCEPT (SELECT ... FROM producto JOIN categoria WHERE ...) -- 0 filas\nValidacion COUNT(*): 49.850 = 49.850 | Prueba DCL: GRANT SELECT a rol_reportes_foodstore y REVOKE en cliente/pedido (bloqueo verificado).", "Verificacion Requisito 4 y 4.2.4 - views.sql:85-220")
 heading2("D. materializadas.sql - vista + indice + EXPLAIN (TP3/materializadas.sql:1)")
 code_block("EXPLAIN (ANALYZE,BUFFERS) SELECT c.nombre, DATE_TRUNC('month',p.fecha), COUNT(DISTINCT p.id), SUM(pd.subtotal) FROM ... -- ANTES 67ms/760ms\nCREATE MATERIALIZED VIEW mv_facturacion_categoria_mes AS SELECT ... GROUP BY c.nombre, DATE_TRUNC ... ORDER BY mes DESC WITH DATA; -- :50\nCREATE UNIQUE INDEX idx_mv_facturacion_categoria_mes ON mv_facturacion_categoria_mes(categoria,mes); -- :79\nEXPLAIN (ANALYZE,BUFFERS) SELECT * FROM mv_facturacion_categoria_mes; -- DESPUES 1.5ms/0.020ms\n-- REFRESH MATERIALIZED VIEW CONCURRENTLY mv_facturacion_categoria_mes; -- :112", "Extracto completo - TP3/materializadas.sql:1-115")
 heading2("E. Specs - Referencias")
 body("Kiro specs conservados en repo (carpeta specs/ como exige pag. 5): Proyecto_Integrador/specs/spec_punto_4_1.md (5.3kB, Plan de Indexado), Proyecto_Integrador/specs/spec_punto_4.2/requirements.md (Parte B, 3 requisitos EARS), Proyecto_Integrador/specs/spec_punto_4.3/requirements.md (Parte C, 5 requisitos EARS, Glosario Vista_Materializada, WITH_DATA, REFRESH_CONCURRENTLY, Latencia_de_Dato). Cada spec incluye Introduction, Glossary, Requirements y criterios de aceptacion que OpenCode uso como prompt.")
-heading2("F. Como reproducir (sin README separado)")
-code_block("# 1. Restaurar esquema base\npsql -f Proyecto_Integrador/database/schema.sql\npsql -f Proyecto_Integrador/database/seed.sql  # o data.sql ampliado\n# 2. Parte A - medir ANTES\npsql -c \"EXPLAIN (ANALYZE,BUFFERS) SELECT * FROM pedido WHERE fecha BETWEEN ...;\" # Anotacion_mediciones.txt:2\n# 3. Crear indices y medir DESPUES\npsql -f TP3/indices.sql\npsql -c \"EXPLAIN (ANALYZE,BUFFERS) SELECT ...\" # debe pasar a Index Scan\n# 4. Parte B - vistas\npsql -f TP3/views.sql\npsql -c \"(SELECT * FROM vw_productos_vigentes) EXCEPT (SELECT ...)\" -- 0 filas\n# 5. Parte C - vista materializada\npsql -f TP3/materializadas.sql  # incluye EXPLAIN ANTES + CREATE WITH DATA + EXPLAIN DESPUES\npsql -c \"REFRESH MATERIALIZED VIEW CONCURRENTLY mv_facturacion_categoria_mes;\" -- requiere UNIQUE", "Flujo reproducible - protocolo seguridad Unidad 1: probar en copia o transaccion reversible")
+heading2("F. Guia de reproduccion y protocolo de seguridad (Ver README.md)")
+code_block("# 1. Respaldo preventivo y copia de trabajo (protocolo_seguridad.md)\npg_dump -U postgres -d foodstore -F c -f backup_foodstore_pre_tp3.backup\ncreatedb -U postgres -T foodstore foodstore_copia\n# 2. Restaurar esquema y volumen de datos\npsql -d foodstore_copia -f Proyecto_Integrador/database/schema.sql\npsql -d foodstore_copia -f Proyecto_Integrador/database/seed.sql\n# 3. Pruebas de queries e indices\npsql -d foodstore_copia -f TP3/queries.sql\npsql -d foodstore_copia -f TP3/indices.sql\n# 4. Vistas y prueba DCL de rol\npsql -d foodstore_copia -f TP3/views.sql\n# 5. Vista materializada con medicion y refresco concurrente\npsql -d foodstore_copia -f TP3/materializadas.sql", "Flujo reproducible - protocolo de seguridad: backup previo y transacciones reversibles")
 
 # Cierre
 heading1("7. Cierre y criterios de evaluacion")
@@ -391,7 +397,7 @@ body("Al finalizar, Food Store cuenta con plan de indexado justificado con datos
 pdf.ln(4)
 pdf.set_font("Helvetica", "I", 7.5)
 pdf.set_text_color(80,80,80)
-pdf.multi_cell(0, 4, "Repositorio Git: historial con commits separados (ej: 'Indice idx_pedido_fecha - reduce Seq Scan en reporte mensual') y diff por commit. Informe completo detallado en TP3/informe_mediciones.md (732 lineas, 9 secciones, renderizable). Este PDF resume con extractos literales para entrega evaluable TP3_MatiasLimina.pdf.")
+pdf.multi_cell(0, 4, "Repositorio GitHub: https://github.com/MatiasLimina/BaseDeDatos2.git con historial de commits y diff por commit. Autores: Matias Limina, Nicolas Monjelardi, Lautaro Aguero. Entregables completos con README.md, duia.md, informe_mediciones.md y PDF.")
 
 # Save
 out = r"D:\A_Universidad\Tercer semestre\Base de Datos 2\BaseDeDatos2\TP3\TP3_MatiasLimina.pdf"

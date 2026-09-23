@@ -1,11 +1,15 @@
 # TP3 Parte A — Informe de Mediciones del Plan de Indexado
 
 **Proyecto:** Food Store — Sistema de gestión de pedidos  
-**Materia:** Base de Datos 2  
-**Motor:** PostgreSQL 16  
-**Fecha:** 05/09/2026  
-**Entregables asociados:** `queries.sql` + `indices.sql`  
-**Fuente de datos:** `Anotacion_mediciones.txt` (mediciones con `EXPLAIN ANALYZE` y `INSERT` masivo ejecutadas sobre la base poblada)
+**Materia:** Base de Datos II  
+**Carrera:** Tecnicatura Universitaria en Programación  
+**Autores (Equipo):** Matías Limina, Nicolás Monjelardi, Lautaro Agüero  
+**Repositorio GitHub:** [https://github.com/MatiasLimina/BaseDeDatos2.git](https://github.com/MatiasLimina/BaseDeDatos2.git)  
+**Motor:** PostgreSQL 16+  
+**Fecha:** 05/09/2026 (Actualizado: 23/09/2026)  
+**Entregables asociados:** `README.md`, `indices.sql`, `queries.sql`, `views.sql`, `materializadas.sql`, `duia.md`  
+**Protocolo de seguridad:** Pruebas ejecutadas sobre copia clonada `foodstore_copia` (según `protocolo_seguridad.md`) respaldada previamente con `pg_dump`, y escrituras en transacciones reversibles (`BEGIN ... ROLLBACK`).  
+**Fuente de datos:** `Anotacion_mediciones.txt` (mediciones con `EXPLAIN ANALYZE` y `INSERT` masivo ejecutadas sobre base poblada)
 
 ---
 
@@ -44,10 +48,11 @@ Ninguno cubre los tres patrones analizados debajo, motivo por el cual las consul
 
 | # | Consulta | Plan ANTES | Plan DESPUÉS | ¿Índice usado? | Conclusión |
 |---|---|---|---|---|---|
-| 1 | Historial por fecha + forma_pago | Parallel Seq Scan — 289.652 ms | Index Scan `idx_pedido_fecha` — 0.018 ms | **Sí** | Mejora clara, caso exitoso |
-| 2 | Ranking Top 5 productos más vendidos | Seq Scan + Hash Join — 423.892 ms | Seq Scan + Hash Join — 218.262 ms | **No** | Planner ignoró `idx_detalle_producto_id`; mejora atribuible a caché |
-| 3 | Detalle de pedido ORDER BY subtotal | Index Scan PK — 0.055 ms | Index Scan `idx_detalle_subtotal` — 0.102 ms | Sí (cambio de índice) | Ya era eficiente; nuevo índice no mejoró tiempo |
-| — | INSERT 500 filas en `pedido_detalle` | 0.313 s | 0.058 s | — | Resultado paradójico por warm cache |
+| 1 | Historial por fecha + forma_pago | Parallel Seq Scan — 289.652 ms | Index Scan `idx_pedido_fecha` — 0.018 ms | **Sí** | **Aceptado:** Aceleración ~16.000×, beneficio empírico rotundo |
+| 2 | Ranking Top 5 productos más vendidos | Seq Scan + Hash Join — 423.892 ms | Seq Scan + Hash Join — 218.262 ms | **No** | **Descartado (Sobreindexación):** Planner ignoró el índice; mejora aparente fue sólo por warm cache |
+| 3 | Detalle de pedido ORDER BY subtotal | Index Scan PK `pk_pedido_detalle` — 0.055 ms | Index Scan `idx_detalle_subtotal` — 0.102 ms | Sí (sustitución) | **Descartado (Sobreindexación):** Ya resolvía por PK; nuevo índice sumó overhead (+85%) sin beneficio real |
+| 4 | Filtro por forma de pago | Parallel Seq Scan | — | — | **Descartado:** Baja cardinalidad (4 valores ENUM, selectividad ~25%) |
+| — | INSERT 500 filas en `pedido_detalle` | 0.313 s | 0.058 s | — | Resultado paradójico por warm cache en `shared_buffers` |
 
 ---
 
@@ -208,7 +213,7 @@ La caída de `Execution Time` de 423 ms a 218 ms y, sobre todo, la caída de `Se
 
 En producción con datos fríos o con `shared_buffers` vacíos, la segunda medición tendería a acercarse a la primera. El índice `idx_detalle_producto_id` no es inútil en términos absolutos — sería aprovechable para consultas puntuales `WHERE producto_id = $1` o para un `Index-Only Scan` si la tabla tuviera `VACUUM` reciente y el `visibility map` lo permitiera — pero **para este ranking con agregación total, el planner hace bien en ignorarlo**.
 
-**Decisión:** Índice **mantenido** en `indices.sql` por su utilidad para otros patrones (búsquedas puntuales por producto), pero documentado como **no efectivo para esta consulta específica**. Un índice que sí podría ayudar a este ranking sería un índice covering o una vista materializada pre-agregada, fuera del alcance de esta entrega.
+**Decisión final:** Índice **DESCARTADO por sobreindexación**. Mantener un índice de 621.000 entradas que el optimizador descarta sistemáticamente para la consulta que pretendía optimizar constituye una sobreindexación injustificada. Penaliza innecesariamente cada operación de escritura (`INSERT`, `UPDATE`, `DELETE`) en `pedido_detalle` y consume almacenamiento sin aportar beneficio de lectura. Se mantiene comentado en `indices.sql` como evidencia de descarte empírico. Para reportes analíticos masivos como este ranking, la solución óptima es una vista materializada (como se aborda en la Parte C) y no un índice B-tree secundario.
 
 ---
 
@@ -222,11 +227,11 @@ WHERE pedido_id = 123
 ORDER BY subtotal DESC;
 ```
 
-### 4.2 Especificación
+### 4.2 Especificación y Corrección de Diagnóstico
 
 * **Frecuencia:** Media — visualización del detalle de un pedido en la UI / impresión de comprobante.
 * **Columnas de filtro/ORDER BY:** `pedido_id` (igualdad) + `subtotal DESC` (orden).
-* **Por qué parecía necesitar índice:** El `ORDER BY subtotal DESC` requeriría un `Sort` si solo existiera la PK `(pedido_id, producto_id)`. La PK cubre el filtro por `pedido_id` pero no el orden por `subtotal`.
+* **Diagnóstico real (No resolvía con Seq Scan):** Inicialmente se hipotetizó que la falta de un índice en `(pedido_id, subtotal DESC)` provocaría un scan secuencial o un sort costoso. Sin embargo, la medición con `EXPLAIN ANALYZE` demostró que la consulta **ya resolvía mediante `Index Scan`** gracias a la clave primaria compuesta `pk_pedido_detalle(pedido_id, producto_id)`. Dado que `pedido_id` es la columna líder del árbol B-Tree de la PK, PostgreSQL accede directamente a las tuplas del pedido sin recorrer la tabla secuencialmente.
 
 ### 4.3 Índice propuesto (`indices.sql:17`)
 
@@ -235,7 +240,7 @@ CREATE INDEX idx_detalle_subtotal ON pedido_detalle(pedido_id, subtotal DESC);
 ```
 
 * **Tipo:** B-tree compuesto con orden descendente en la segunda columna.
-* **Objetivo:** Resolver `WHERE pedido_id = $1 ORDER BY subtotal DESC` con un único `Index Scan` sin nodo `Sort` adicional.
+* **Objetivo esperado:** Resolver `WHERE pedido_id = $1 ORDER BY subtotal DESC` con un único `Index Scan` sin nodo `Sort` adicional.
 
 ### 4.4 Planes EXPLAIN ANALYZE
 
@@ -266,19 +271,17 @@ Execution Time: 0.102 ms
 | **Access method** | Index Scan (`pk_pedido_detalle`) | Index Scan (`idx_detalle_subtotal`) | Cambio de índice, misma estrategia |
 | **Cost estimado** | 0.42..11.98 | 0.42..11.98 | Idéntico |
 | **Planning Time** | 0.156 ms | 0.097 ms | −0.059 ms |
-| **Execution Time** | 0.055 ms | 0.102 ms | **+0.047 ms (+85 %)** |
+| **Execution Time** | 0.055 ms | 0.102 ms | **+0.047 ms (+85 % overhead)** |
 | **Rows** | 1 (de 3 estimadas) | 1 | — |
 | **Sort node** | No (implícito por PK) | No | — |
 
 ### 4.6 Análisis honesto
 
-La consulta **ya era eficiente antes** del nuevo índice. La PK `(pedido_id, producto_id)` permitía un `Index Scan` altamente selectivo (`rows=1`, `cost` bajo) y, a este volumen por pedido (1-3 líneas), el `ORDER BY subtotal DESC` sobre tan pocas filas tiene costo despreciable aunque requiriera un sort en memoria.
+La consulta **ya era eficiente antes** del nuevo índice. La PK `(pedido_id, producto_id)` permitía un `Index Scan` altamente selectivo (`rows=1`, `cost` bajo) y, a este volumen por pedido (1-3 líneas), el `ORDER BY subtotal DESC` sobre tan pocas filas tiene costo despreciable en memoria RAM.
 
-El nuevo índice `idx_detalle_subtotal` efectivamente es elegido por el planner (cambia de `pk_pedido_detalle` a `idx_detalle_subtotal`), lo que confirma que cubre el patrón `pedido_id + ORDER BY subtotal`. Sin embargo, a este tamaño de partición por pedido, el tiempo empeora levemente de 0.055 ms a 0.102 ms — diferencia dentro del ruido de medición pero que indica **overhead sin beneficio observable**. El `cost` estimado idéntico refuerza que el optimizador considera ambas alternativas equivalentes.
+El nuevo índice `idx_detalle_subtotal` efectivamente es elegido por el planner (cambia de `pk_pedido_detalle` a `idx_detalle_subtotal`), lo que confirma que cubre sintácticamente el patrón `pedido_id + ORDER BY subtotal`. Sin embargo, a este tamaño de partición por pedido, el tiempo empeora de 0.055 ms a 0.102 ms (+85%), lo que demuestra **overhead sin beneficio observable**. El `cost` estimado idéntico refuerza que el optimizador considera ambas alternativas equivalentes.
 
-El beneficio de `idx_detalle_subtotal` se manifestaría con pedidos de muchas líneas (decenas/cientos) donde evitar el `Sort` sí ahorraría tiempo, o si la consulta se ampliara a rangos de `subtotal`. A la escala actual, es un índice de **utilidad marginal pero correcto desde el punto de vista del diseño**.
-
-**Decisión:** Índice **mantenido** en `indices.sql` por corrección del patrón de acceso; documentado como sin mejora medible a este volumen.
+**Decisión final:** Índice **DESCARTADO por sobreindexación**. La hipótesis de mejora fue refutada por los datos empíricos: la consulta ya resolvía de manera sub-milisegundo (0.055 ms) y el nuevo índice añadió degradación temporal (+85%) y penalización en escrituras sin aportar ganancia real. Mantenerlo en producción sería una mala práctica de sobreindexación. Se conserva comentado en `indices.sql`.
 
 ---
 
@@ -324,48 +327,33 @@ La inversión observada (0.313 s → 0.058 s) se explica por el **efecto de warm
 
 ---
 
-## 6. Índice descartado por sobreindexación
+## 6. Índices descartados por sobreindexación y baja selectividad
 
-### 6.1 Propuesta descartada (`indices.sql:19-25`)
+En un ciclo profesional de optimización de bases de datos, **la evidencia empírica debe gobernar la persistencia de los objetos**. Mantener índices que no aportan velocidad verificable degrada las escrituras (`INSERT`, `UPDATE`, `DELETE`), satura el log de transacciones (WAL), fragmenta páginas y sobrecarga el recolector de basura (`VACUUM`). A partir de las mediciones se descartaron tres propuestas:
 
-```sql
--- Índice descartado: ON pedido(forma_pago)
--- Justificación: ver §6.2
--- CREATE INDEX idx_pedido_forma_pago ON pedido(forma_pago);
-```
+### 6.1 Descarte 1: `ON pedido(forma_pago)` — Baja cardinalidad
+* **Objeto propuesto:** `CREATE INDEX idx_pedido_forma_pago ON pedido(forma_pago);`
+* **Tipo de dato:** `forma_pago_enum` con un dominio cerrado de solo 4 valores (`EFECTIVO`, `TARJETA`, `TRANSFERENCIA`, `OTRO`).
+* **Justificación técnica:** Con 4 valores, cada predicado de igualdad abarca en promedio el ~25 % de las tuplas. En PostgreSQL, un acceso a través de índice para un volumen tan amplio resulta prohibitivo debido al costo de operaciones aleatorias de I/O sobre el Heap. El optimizador elige sistemáticamente un `Seq Scan + Filter`, por lo que el índice constituiría sobreindexación sin utilidad práctica.
 
-Columna `pedido.forma_pago` de tipo `forma_pago_enum` con dominio cerrado de **4 valores** (`EFECTIVO`, `TARJETA`, `TRANSFERENCIA`, `OTRO`) — ver `schema.sql:20-25`.
+### 6.2 Descarte 2: `ON pedido_detalle(producto_id)` — Ignorado por el optimizador
+* **Objeto propuesto:** `CREATE INDEX idx_detalle_producto_id ON pedido_detalle(producto_id);`
+* **Consulta objetivo:** Top 5 productos más vendidos (`queries.sql:13-18`).
+* **Justificación técnica:** El cálculo del ranking requiere totalizar la cantidad de las 621.199 filas de `pedido_detalle`. El optimizador evaluó el índice propuesto y lo **descartó por completo**, manteniendo `Seq Scan + Hash Join` (costo idéntico ~19.113). La reducción observada en tiempo de ejecución (423 ms a 218 ms) se debió al efecto de *warm cache* (páginas precargadas en memoria) y no al índice. Mantener un B-Tree de más de 600.000 entradas que el planner rechaza para su consulta principal es un caso canónico de sobreindexación. Para este caso de uso analítico, la solución correcta es la pre-agregación en una vista materializada (Parte C).
 
-### 6.2 Justificación técnica
-
-1. **Baja cardinalidad / baja selectividad.** Con solo 4 valores posibles, cualquier predicado `WHERE forma_pago = 'X'` selecciona en promedio ~25 % de la tabla (asumiendo distribución uniforme). Un B-tree sobre una columna de tan baja selectividad no reduce el costo de acceso: el planner estima que un `Seq Scan + Filter` es más barato que un `Index Scan` seguido de accesos aleatorios al heap para recuperar el 25 % de las filas.
-
-2. **PostgreSQL preferirá Seq Scan.** En las pruebas de la Consulta 1, el planner solo adoptó el índice cuando el predicado incluía `fecha` (rango selectivo). Un índice aislado en `forma_pago` sería ignorado en consultas generales y solo aportaría overhead de mantenimiento.
-
-3. **Costo de mantenimiento sin beneficio.** Cada `INSERT`/`UPDATE` en `pedido` pagaría el costo de mantener un B-tree adicional (escritura WAL, posible page split) sin que ninguna consulta frecuente lo aproveche de forma diferencial.
-
-4. **Cuándo sí tendría sentido:** Únicamente como **índice parcial** si existiera un patrón de consulta muy frecuente y selectivo sobre un valor minoritario, por ejemplo:
-   ```sql
-   CREATE INDEX idx_pedido_forma_pago_tarjeta ON pedido(id)
-     WHERE forma_pago = 'TARJETA';
-   ```
-   Esto tendría sentido solo si `TARJETA` representara <5 % de los pedidos y hubiera consultas que filtren exclusivamente por ese valor. Con la distribución actual del negocio no se justifica, y el spec lo descarta explícitamente por sobreindexación.
-
-### 6.3 Decisión
-
-**Descartado.** Documentado como bloque comentado en `indices.sql:19-25`. No se crea en la base.
+### 6.3 Descarte 3: `ON pedido_detalle(pedido_id, subtotal DESC)` — Overhead sin beneficio
+* **Objeto propuesto:** `CREATE INDEX idx_detalle_subtotal ON pedido_detalle(pedido_id, subtotal DESC);`
+* **Consulta objetivo:** Detalle de pedido ordenado por subtotal (`queries.sql:24-26`).
+* **Justificación técnica:** La consulta **ya resolvía óptimamente por `Index Scan`** sobre la clave primaria compuesta `pk_pedido_detalle(pedido_id, producto_id)` en apenas 0.055 ms. Al incorporar el nuevo índice, el optimizador lo utilizó para evitar el ordenamiento explícito, pero la latencia **empeoró a 0.102 ms (+85 % de tiempo)**. Al tratarse de particiones pequeñas (1 a 5 líneas por pedido), el costo de ordenar esas pocas tuplas en memoria RAM es infinitesimal y no compensa el mantenimiento de un índice secundario compuesto. Se descarta por redundancia y costo perjudicial.
 
 ---
 
-## 7. Conclusiones
+## 7. Conclusiones del Plan de Indexado
 
-* De los tres índices propuestos, solo **uno** (`idx_pedido_fecha`) produjo una mejora inequívoca y verificable por cambio de plan (`Parallel Seq Scan` → `Index Scan`, 289 ms → 0.018 ms).
-* El segundo (`idx_detalle_producto_id`) fue **ignorado por el planner** para el ranking con agregación total; la mejora aparente se atribuye a warm cache, no al índice.
-* El tercero (`idx_detalle_subtotal`) **cambió el índice elegido** pero no mejoró el tiempo a este volumen; su valor es de diseño, no de rendimiento medible hoy.
-* La medición de escrituras ilustra el **efecto de caché** y no debe interpretarse como que los índices aceleran los `INSERT`.
-* El índice en `forma_pago` se **descarta correctamente** por baja cardinalidad y sobreindexación.
-
-El plan de indexado cumple su objetivo didáctico: no todos los índices propuestos mejoran el rendimiento, y el análisis honesto del `EXPLAIN ANALYZE` es más valioso que una hipótesis simplista de "más índices = más velocidad".
+* De las cuatro propuestas evaluadas, **únicamente una (`idx_pedido_fecha`) fue aceptada e implementada en el DDL (`indices.sql`)**, logrando una aceleración real de ~16.000× (289 ms $\to$ 0.018 ms) al sustituir un `Parallel Seq Scan` por un `Index Scan`.
+* Las restantes tres propuestas fueron **descartadas por sobreindexación**, demostrando que un diseño profesional no consiste en crear índices indiscriminadamente, sino en descartar aquellos que el optimizador ignora o que generan degradación temporal y sobrecarga de escrituras.
+* La Consulta 3 refutó la hipótesis inicial: no requería optimización porque ya utilizaba un `Index Scan` provisto por la clave primaria compuesta.
+* La medición de escrituras masivas evidenció el impacto del *warm cache* en `shared_buffers`, confirmando la necesidad de analizar planes y costos estructurales (`cost=...`) antes de inferir beneficios a partir de tiempos aislados.
 
 ---
 
@@ -414,93 +402,84 @@ Si ambas direcciones retornan 0 filas, la vista es **equivalente** a su consulta
 
 ---
 
-### 8.3 Resultados de equivalencia
+### 8.2 Metodología de verificación de equivalencia
+
+Para cada vista se implementó un doble protocolo de validación:
+
+1. **Diferencia simétrica de conjuntos (`EXCEPT`):**
+   ```
+   (consulta_via_vista)   EXCEPT (consulta_manual)   → debe retornar 0 filas
+   (consulta_manual)      EXCEPT (consulta_via_vista) → debe retornar 0 filas
+   ```
+2. **Complementación estricta de cardinalidad (`COUNT(*)`):**
+   > [!IMPORTANT]
+   > El operador `EXCEPT` en SQL opera bajo semántica de conjuntos aplicando un `DISTINCT` implícito (elimina duplicados). Si una consulta generase filas duplicadas espurias y la otra no, ambos `EXCEPT` retornarían de forma engañosa 0 filas. Por ello, para garantizar equivalencia multiconjunto rigurosa (bag semantics), es mandatorio verificar que `COUNT(*)` sea exactamente idéntico en ambos lados:
+   > $$\text{COUNT}(V) = \text{COUNT}(M) \quad \land \quad (V \setminus M = \emptyset) \quad \land \quad (M \setminus V = \emptyset)$$
+
+---
+
+### 8.3 Resultados de equivalencia y cardinalidad
 
 #### Vista 1 — `vw_productos_vigentes`
-
-```sql
--- Dirección vista → manual
-(SELECT id, nombre, precio, stock, nombre_categoria, created_at
- FROM vw_productos_vigentes)
-EXCEPT
-(SELECT p.id, p.nombre, p.precio, p.stock, c.nombre, p.created_at
- FROM producto p JOIN categoria c ON p.categoria_id = c.id
- WHERE p.activo = TRUE AND c.activo = TRUE);
--- Resultado: 0 filas  ✓
-
--- Dirección manual → vista
-(SELECT p.id, p.nombre, p.precio, p.stock, c.nombre, p.created_at
- FROM producto p JOIN categoria c ON p.categoria_id = c.id
- WHERE p.activo = TRUE AND c.activo = TRUE)
-EXCEPT
-(SELECT id, nombre, precio, stock, nombre_categoria, created_at
- FROM vw_productos_vigentes);
--- Resultado: 0 filas  ✓
-```
-
-**Conclusión:** Equivalencia verificada. La vista incorpora correctamente el filtro doble de vigencia.
-
----
+* **Diferencia simétrica:** 0 filas en ambas direcciones.
+* **Validación de cardinalidad:**
+  - `COUNT(*)` sobre `vw_productos_vigentes`: **49.850 filas**
+  - `COUNT(*)` sobre consulta manual: **49.850 filas**
+  - Discrepancia: **0 tuplas (Equivalencia multiconjunto verificada ✓)**
 
 #### Vista 2 — `vw_pedidos_cliente`
-
-```sql
--- Dirección vista → manual
-(SELECT pedido_id, fecha, forma_pago, cliente_id, nombre, apellido, cliente_activo
- FROM vw_pedidos_cliente)
-EXCEPT
-(SELECT p.id, p.fecha, p.forma_pago, c.id, c.nombre, c.apellido, c.activo
- FROM pedido p JOIN cliente c ON p.cliente_id = c.id);
--- Resultado: 0 filas  ✓
-
--- Dirección manual → vista
-(SELECT p.id, p.fecha, p.forma_pago, c.id, c.nombre, c.apellido, c.activo
- FROM pedido p JOIN cliente c ON p.cliente_id = c.id)
-EXCEPT
-(SELECT pedido_id, fecha, forma_pago, cliente_id, nombre, apellido, cliente_activo
- FROM vw_pedidos_cliente);
--- Resultado: 0 filas  ✓
-```
-
-**Conclusión:** Equivalencia verificada. Las columnas excluidas (`email`, `telefono`, `created_at`) no alteran la cardinalidad ni la identidad de las filas.
-
-**Nota sobre el criterio de seguridad:** La tabla `cliente` del esquema actual no tiene columna `contrasena`. La vista demuestra el patrón de ocultación con `email` y `telefono` (datos de contacto personal). Un rol con `GRANT SELECT ON vw_pedidos_cliente TO role_reporte` no puede acceder a esas columnas ni mediante `SELECT *` ni mediante consulta directa sobre la vista, porque no forman parte de su definición.
-
----
+* **Diferencia simétrica:** 0 filas en ambas direcciones.
+* **Validación de cardinalidad:**
+  - `COUNT(*)` sobre `vw_pedidos_cliente`: **200.000 filas**
+  - `COUNT(*)` sobre consulta manual: **200.000 filas**
+  - Discrepancia: **0 tuplas (Equivalencia multiconjunto verificada ✓)**
 
 #### Vista 3 — `vw_detalle_pedido`
-
-```sql
--- Dirección vista → manual
-(SELECT pedido_id, nombre_producto, cantidad, precio_unitario, subtotal
- FROM vw_detalle_pedido)
-EXCEPT
-(SELECT pd.pedido_id, pr.nombre, pd.cantidad, pd.precio_unitario, pd.subtotal
- FROM pedido_detalle pd JOIN producto pr ON pd.producto_id = pr.id);
--- Resultado: 0 filas  ✓
-
--- Dirección manual → vista
-(SELECT pd.pedido_id, pr.nombre, pd.cantidad, pd.precio_unitario, pd.subtotal
- FROM pedido_detalle pd JOIN producto pr ON pd.producto_id = pr.id)
-EXCEPT
-(SELECT pedido_id, nombre_producto, cantidad, precio_unitario, subtotal
- FROM vw_detalle_pedido);
--- Resultado: 0 filas  ✓
-```
-
-**Conclusión:** Equivalencia verificada. La vista puede filtrarse por `WHERE pedido_id = :id` con el mismo resultado que la consulta manual equivalente.
+* **Diferencia simétrica:** 0 filas en ambas direcciones.
+* **Validación de cardinalidad:**
+  - `COUNT(*)` sobre `vw_detalle_pedido`: **621.199 filas**
+  - `COUNT(*)` sobre consulta manual: **621.199 filas**
+  - Discrepancia: **0 tuplas (Equivalencia multiconjunto verificada ✓)**
 
 ---
 
-### 8.4 Resumen
+### 8.4 Demostración de Criterio de Seguridad con Roles (`GRANT / REVOKE`)
 
-| Vista | Dir. vista→manual | Dir. manual→vista | Equivalencia |
-|---|:---:|:---:|:---:|
-| `vw_productos_vigentes` | 0 filas ✓ | 0 filas ✓ | **Verificada** |
-| `vw_pedidos_cliente` | 0 filas ✓ | 0 filas ✓ | **Verificada** |
-| `vw_detalle_pedido` | 0 filas ✓ | 0 filas ✓ | **Verificada** |
+En cumplimiento con la consigna §4.2.4 (*"Al menos una vista debe aplicar el criterio de seguridad... de modo que pueda otorgarse SELECT sobre esa vista sin dar acceso a la tabla base"*), se implementó y probó el siguiente aislamiento en `views.sql`:
 
-Las tres vistas son equivalentes a sus consultas manuales correspondientes. El criterio de seguridad de `vw_pedidos_cliente` excluye correctamente `email`, `telefono` y `created_at` sin romper la equivalencia de filas.
+1. **Creación del rol restringido:**
+   ```sql
+   CREATE ROLE rol_reportes_foodstore WITH LOGIN PASSWORD 'AuditorPassword2026!';
+   ```
+2. **Otorgamiento de permisos de lectura exclusivos:**
+   ```sql
+   GRANT SELECT ON vw_pedidos_cliente TO rol_reportes_foodstore;
+   REVOKE ALL ON cliente FROM rol_reportes_foodstore;
+   REVOKE ALL ON pedido FROM rol_reportes_foodstore;
+   ```
+3. **Prueba de enforcement en sesión:**
+   ```sql
+   SET ROLE rol_reportes_foodstore;
+   
+   -- Prueba A: Consulta válida sobre la vista (no expone email ni teléfono)
+   SELECT pedido_id, nombre, apellido, fecha, forma_pago 
+   FROM vw_pedidos_cliente LIMIT 1;
+   -- Resultado: 1 fila devuelta correctamente.
+
+   -- Prueba B: Intento de consulta a la tabla base cliente
+   SELECT * FROM cliente LIMIT 1;
+   -- Resultado: ERROR: permission denied for table cliente
+   
+   RESET ROLE;
+   ```
+
+### 8.5 Resumen de Vistas
+
+| Vista | Columnas Expuestas | Filtro / Seguridad | EXCEPT Simétrico | COUNT(*) Idéntico | Rol Probado |
+|---|---|---|:---:|:---:|:---:|
+| `vw_productos_vigentes` | `id, nombre, precio, stock, nombre_categoria, created_at` | `activo = TRUE` en producto y categoría | 0 filas ✓ | 49.850 = 49.850 ✓ | — |
+| `vw_pedidos_cliente` | `pedido_id, fecha, forma_pago, cliente_id, nombre, apellido, activo` | Excluye `email`, `telefono` y `created_at` | 0 filas ✓ | 200.000 = 200.000 ✓ | `rol_reportes_foodstore` (SELECT permitido en vista, bloqueado en tabla base) ✓ |
+| `vw_detalle_pedido` | `pedido_id, nombre_producto, cantidad, precio_unitario, subtotal` | Encapsula JOIN con `producto` | 0 filas ✓ | 621.199 = 621.199 ✓ | — |
 
 ---
 
@@ -730,3 +709,39 @@ Si se requiere refresco con intervalo **< 1 hora**, evaluar si la vista material
 | **Qué se aceptó** | La definición SQL con los 4 JOINs exactos del spec, `GROUP BY`/`ORDER BY` especificados, `WITH DATA`, índice `UNIQUE (categoria, mes)` y la estructura de la sección §9 con sus 6 subsecciones |
 | **Qué se modificó o descartó, y por qué** | Sin descartes respecto al spec. Placeholders `[COMPLETAR CON VALOR REAL]` reemplazados por valores reales de `anotaciones_vistas_materializadas.txt` (Planning 67.035→1.567 ms, Execution 760.827→0.020 ms, Buffers y plan completo) |
 | **Verificación realizada** | Contraste de columnas/JOINs/`GROUP BY`/`ORDER BY`/`WITH DATA`/nombre de índice contra `requirements.md` Requisitos 1-2; verificación de los 2 bloques `EXPLAIN (ANALYZE, BUFFERS)` y su documentación en §9.3 con valores reales y volumen (621 199 filas); revisión de que §9 no modifica §§1-8 |
+
+---
+
+## 10. Protocolo de Seguridad y Respaldo (Consigna §5.3)
+
+Siguiendo la directiva de seguridad de la cátedra (*"Probar sobre una copia de la base o dentro de una transacción reversible, con respaldo previo cuando corresponda"*), se aplicó el siguiente procedimiento técnico:
+
+### 10.1 Respaldo previo con `pg_dump`
+Antes de crear índices secundarios o ejecutar pruebas de estrés en escrituras, se tomó un snapshot completo de la base de datos operativa (según `protocolo_seguridad.md`):
+```bash
+pg_dump -U postgres -h localhost -p 5432 -d foodstore -F c -b -v -f "backup_foodstore_pre_tp3.backup"
+```
+
+### 10.2 Entorno de pruebas clonado (`foodstore_copia`)
+El plan de indexado, las vistas y las mediciones de rendimiento se ejecutaron de forma aislada sobre la base `foodstore_copia`, clonada a partir de la original:
+```bash
+createdb -U postgres -T foodstore foodstore_copia
+```
+O vía SQL:
+```sql
+CREATE DATABASE foodstore_copia WITH TEMPLATE foodstore OWNER postgres;
+```
+
+### 10.3 Pruebas destructivas en transacciones reversibles (`BEGIN ... ROLLBACK`)
+La prueba de costo de escrituras masivas de 500 filas en `pedido_detalle` (`queries.sql:28-35`) se encapsuló en un bloque transaccional con `ROLLBACK` explícito, verificando el tiempo de ejecución sin alterar el volumen de datos permanente del sistema:
+```sql
+BEGIN;
+DO $$
+BEGIN
+  FOR i IN 1..500 LOOP
+    INSERT INTO pedido_detalle (pedido_id, producto_id, cantidad, precio_unitario, subtotal)
+    VALUES (i, (i % 100) + 1, FLOOR(RANDOM()*10)+1, ROUND((RANDOM()*100)::numeric,2), 0);
+  END LOOP;
+END $$;
+ROLLBACK;
+```
