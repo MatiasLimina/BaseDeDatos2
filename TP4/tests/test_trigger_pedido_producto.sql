@@ -2,7 +2,8 @@
 -- Ejecutar: psql -v ON_ERROR_STOP=1 -d tp4_foodstore -f TP4/tests/test_trigger_pedido_producto.sql
 -- Requiere la seccion 4 de TP4/tp_desnormalizacion_top_categorias.sql (con disparadores instalados).
 -- Cada escenario va en un subbloque que termina con una excepcion centinela (SQLSTATE T4RB1) que
--- revierte sus datos. Productos de apoyo: 10 -> categoria 1, 11 -> categoria 2, 13 -> 4, 14 -> 5.
+-- revierte sus datos. Productos de apoyo: 10 y 20 (categoria c1), 11 (c2), 12 (c3), 13 y 14 (categorias
+-- distintas entre si); las categorias se leen de `producto` y se verifican al inicio.
 -- Dias de prueba: hoy, ayer (hoy - 1) y el dia lejano 2030-01-15.
 
 CREATE OR REPLACE FUNCTION t4_vdc_total(p_f DATE, p_c BIGINT) RETURNS NUMERIC LANGUAGE sql AS
@@ -23,7 +24,13 @@ DECLARE
     b1 NUMERIC; b2 NUMERIC; l1 INTEGER; l2 INTEGER;
     c13 NUMERIC; c14 NUMERIC; s13_hoy NUMERIC; n13_hoy INTEGER;
     v_n BIGINT;
+    c1 BIGINT; c2 BIGINT; c3 BIGINT;
 BEGIN
+    SELECT categoria_id INTO c1 FROM producto WHERE id = 10;
+    SELECT categoria_id INTO c2 FROM producto WHERE id = 11;
+    SELECT categoria_id INTO c3 FROM producto WHERE id = 12;
+    ASSERT c1 IS NOT NULL AND c1 <> c2 AND c2 <> c3 AND c1 <> c3 AND c1 = (SELECT categoria_id FROM producto WHERE id = 20),
+           'precondicion: los productos 10/20 (misma categoria), 11 y 12 deben existir y ser de 3 categorias distintas';
     ASSERT EXISTS (SELECT 1 FROM pg_trigger WHERE tgname = 'trg_vdc_pedido' AND NOT tgisinternal),
            'no existe el disparador trg_vdc_pedido';
     ASSERT EXISTS (SELECT 1 FROM pg_trigger WHERE tgname = 'trg_vdc_producto' AND NOT tgisinternal),
@@ -34,17 +41,18 @@ BEGIN
         INSERT INTO pedido (fecha, forma_pago, cliente_id) VALUES (now(), 'EFECTIVO', 1) RETURNING id INTO v_p;
         INSERT INTO pedido_detalle (pedido_id, producto_id, cantidad, precio_unitario, subtotal) VALUES (v_p, 10, 1, 100.00, 100.00), (v_p, 11, 1, 40.50, 40.50);
         INSERT INTO pedido_detalle (pedido_id, producto_id, cantidad, precio_unitario, subtotal, eliminado) VALUES (v_p, 20, 1, 9.99, 9.99, TRUE);
-        b1 := t4_vdc_total(v_hoy, 1); b2 := t4_vdc_total(v_hoy, 2); l1 := t4_vdc_lineas(v_hoy, 1); l2 := t4_vdc_lineas(v_hoy, 2);
+        b1 := t4_vdc_total(v_hoy, c1); b2 := t4_vdc_total(v_hoy, c2); l1 := t4_vdc_lineas(v_hoy, c1); l2 := t4_vdc_lineas(v_hoy, c2);
         UPDATE pedido SET eliminado = TRUE WHERE id = v_p;
-        ASSERT t4_vdc_total(v_hoy, 1) = b1 - 100.00 AND t4_vdc_lineas(v_hoy, 1) = l1 - 1, 'P1: cat 1 = ' || t4_vdc_total(v_hoy, 1) || ' esperado ' || (b1 - 100.00);
-        ASSERT t4_vdc_total(v_hoy, 2) = b2 - 40.50  AND t4_vdc_lineas(v_hoy, 2) = l2 - 1, 'P2: cat 2 = ' || t4_vdc_total(v_hoy, 2);
+        ASSERT t4_vdc_total(v_hoy, c1) = b1 - 100.00 AND t4_vdc_lineas(v_hoy, c1) = l1 - 1, 'P1: cat 1 = ' || t4_vdc_total(v_hoy, c1) || ' esperado ' || (b1 - 100.00);
+        ASSERT t4_vdc_total(v_hoy, c2) = b2 - 40.50  AND t4_vdc_lineas(v_hoy, c2) = l2 - 1, 'P2: cat 2 = ' || t4_vdc_total(v_hoy, c2);
         UPDATE pedido SET eliminado = FALSE WHERE id = v_p;
-        ASSERT t4_vdc_total(v_hoy, 1) = b1 AND t4_vdc_total(v_hoy, 2) = b2 AND t4_vdc_lineas(v_hoy, 1) = l1 AND t4_vdc_lineas(v_hoy, 2) = l2,
+        ASSERT t4_vdc_total(v_hoy, c1) = b1 AND t4_vdc_total(v_hoy, c2) = b2 AND t4_vdc_lineas(v_hoy, c1) = l1 AND t4_vdc_lineas(v_hoy, c2) = l2,
                'P3: la reactivacion debia restituir ambas categorias (el detalle eliminado no vuelve)';
         -- triangulacion: dar de baja un pedido que ya esta dado de baja (TRUE -> TRUE) no hace nada
         UPDATE pedido SET eliminado = TRUE WHERE id = v_p;
-        UPDATE pedido SET eliminado = TRUE, fecha = now() WHERE id = v_p;
-        ASSERT t4_vdc_total(v_hoy, 1) = b1 - 100.00, 'P4: TRUE -> TRUE no debe restar dos veces';
+        UPDATE pedido SET eliminado = TRUE, fecha = v_ts2 WHERE id = v_p;   -- pedido ya eliminado: mover su fecha no aporta nada
+        ASSERT t4_vdc_total(v_hoy, c1) = b1 - 100.00, 'P4: TRUE -> TRUE no debe restar dos veces';
+        ASSERT t4_vdc_total(v_d2, c1) = 0 AND t4_vdc_total(v_d2, c2) = 0, 'P5: un pedido eliminado no debe aparecer en la nueva fecha';
         ASSERT (SELECT count(*) FROM v_auditoria_ventas_diarias) = 0, 'auditoria != 0 filas tras el escenario';
         RAISE EXCEPTION 'rollback' USING ERRCODE = 'T4RB1';
     EXCEPTION WHEN SQLSTATE 'T4RB1' THEN NULL;
@@ -54,17 +62,17 @@ BEGIN
     BEGIN
         INSERT INTO pedido (fecha, forma_pago, cliente_id) VALUES (now(), 'EFECTIVO', 1) RETURNING id INTO v_p;
         INSERT INTO pedido_detalle (pedido_id, producto_id, cantidad, precio_unitario, subtotal) VALUES (v_p, 10, 1, 100.00, 100.00), (v_p, 11, 1, 40.50, 40.50);
-        b1 := t4_vdc_total(v_hoy, 1); b2 := t4_vdc_total(v_hoy, 2);
-        c13 := t4_vdc_total(v_ayer, 1); c14 := t4_vdc_total(v_ayer, 2);
+        b1 := t4_vdc_total(v_hoy, c1); b2 := t4_vdc_total(v_hoy, c2);
+        c13 := t4_vdc_total(v_ayer, c1); c14 := t4_vdc_total(v_ayer, c2);
         UPDATE pedido SET fecha = fecha - INTERVAL '1 day' WHERE id = v_p;
-        ASSERT t4_vdc_total(v_hoy, 1) = b1 - 100.00 AND t4_vdc_total(v_hoy, 2) = b2 - 40.50, 'Q1: hoy debia perder los subtotales';
-        ASSERT t4_vdc_total(v_ayer, 1) = c13 + 100.00 AND t4_vdc_total(v_ayer, 2) = c14 + 40.50, 'Q2: ayer debia ganar los mismos subtotales en las mismas categorias';
+        ASSERT t4_vdc_total(v_hoy, c1) = b1 - 100.00 AND t4_vdc_total(v_hoy, c2) = b2 - 40.50, 'Q1: hoy debia perder los subtotales';
+        ASSERT t4_vdc_total(v_ayer, c1) = c13 + 100.00 AND t4_vdc_total(v_ayer, c2) = c14 + 40.50, 'Q2: ayer debia ganar los mismos subtotales en las mismas categorias';
         UPDATE pedido SET fecha = fecha + INTERVAL '1 day' WHERE id = v_p;
-        ASSERT t4_vdc_total(v_hoy, 1) = b1 AND t4_vdc_total(v_hoy, 2) = b2 AND t4_vdc_total(v_ayer, 1) = c13 AND t4_vdc_total(v_ayer, 2) = c14, 'Q3: vuelta atras';
+        ASSERT t4_vdc_total(v_hoy, c1) = b1 AND t4_vdc_total(v_hoy, c2) = b2 AND t4_vdc_total(v_ayer, c1) = c13 AND t4_vdc_total(v_ayer, c2) = c14, 'Q3: vuelta atras';
         UPDATE pedido SET fecha = v_ts2 WHERE id = v_p;
-        ASSERT t4_vdc_total(v_d2, 1) = 100.00 AND t4_vdc_total(v_d2, 2) = 40.50 AND t4_vdc_lineas(v_d2, 1) = 1, 'Q4: dia lejano';
+        ASSERT t4_vdc_total(v_d2, c1) = 100.00 AND t4_vdc_total(v_d2, c2) = 40.50 AND t4_vdc_lineas(v_d2, c1) = 1, 'Q4: dia lejano';
         UPDATE pedido SET fecha = v_ts2 + INTERVAL '1 hour' WHERE id = v_p;   -- mismo dia de negocio
-        ASSERT t4_vdc_total(v_d2, 1) = 100.00 AND t4_vdc_total(v_d2, 2) = 40.50 AND t4_vdc_lineas(v_d2, 1) = 1, 'Q5: mismo dia, sin efecto neto';
+        ASSERT t4_vdc_total(v_d2, c1) = 100.00 AND t4_vdc_total(v_d2, c2) = 40.50 AND t4_vdc_lineas(v_d2, c1) = 1, 'Q5: mismo dia, sin efecto neto';
         ASSERT (SELECT count(*) FROM v_auditoria_ventas_diarias) = 0, 'auditoria != 0 filas tras el escenario';
         RAISE EXCEPTION 'rollback' USING ERRCODE = 'T4RB1';
     EXCEPTION WHEN SQLSTATE 'T4RB1' THEN NULL;
@@ -75,14 +83,14 @@ BEGIN
         SET LOCAL TimeZone = 'UTC';
         INSERT INTO pedido (fecha, forma_pago, cliente_id) VALUES (TIMESTAMPTZ '2030-01-15 23:30:00-03', 'EFECTIVO', 1) RETURNING id INTO v_p;
         INSERT INTO pedido_detalle (pedido_id, producto_id, cantidad, precio_unitario, subtotal) VALUES (v_p, 10, 1, 100.00, 100.00);
-        ASSERT t4_vdc_total(v_d2, 1) = 100.00, 'Q6: el pedido de las 23:30 BA debia contarse el 2030-01-15';
-        ASSERT t4_vdc_total(v_d2 + 1, 1) = 0, 'Q6: no debia contarse el dia siguiente (UTC)';
+        ASSERT t4_vdc_total(v_d2, c1) = 100.00, 'Q6: el pedido de las 23:30 BA debia contarse el 2030-01-15';
+        ASSERT t4_vdc_total(v_d2 + 1, c1) = 0, 'Q6: no debia contarse el dia siguiente (UTC)';
         ASSERT (SELECT count(*) FROM v_auditoria_ventas_diarias) = 0, 'auditoria != 0 filas tras el escenario';
         RAISE EXCEPTION 'rollback' USING ERRCODE = 'T4RB1';
     EXCEPTION WHEN SQLSTATE 'T4RB1' THEN NULL;
     END;
 
-    -- R) Recategorizacion de un producto con ventas en varios dias: 13 (cat 4) pasa a la categoria de 14
+    -- R) Recategorizacion de un producto con ventas en varios dias: 13 pasa a la categoria de 14
     SELECT categoria_id INTO v_cat13 FROM producto WHERE id = 13;
     SELECT categoria_id INTO v_cat14 FROM producto WHERE id = 14;
     ASSERT v_cat13 <> v_cat14, 'R0: los productos de apoyo 13 y 14 deben ser de categorias distintas';
@@ -133,17 +141,17 @@ BEGIN
 
     -- S) Triangulacion de recategorizacion: producto sin ventas (no altera nada) y con ventas solo en un dia
     BEGIN
-        INSERT INTO producto (nombre, precio, stock, categoria_id) VALUES ('t4 producto sin ventas', 1.00, 0, 1) RETURNING id INTO v_p;
+        INSERT INTO producto (nombre, precio, stock, categoria_id) VALUES ('t4 producto sin ventas', 1.00, 0, c1) RETURNING id INTO v_p;
         SELECT count(*), coalesce(sum(total_vendido), 0) INTO v_n, b1 FROM ventas_diarias_categoria;
-        UPDATE producto SET categoria_id = 2 WHERE id = v_p;
+        UPDATE producto SET categoria_id = c2 WHERE id = v_p;
         SELECT count(*), coalesce(sum(total_vendido), 0) INTO v_n, b2 FROM ventas_diarias_categoria;
         ASSERT b1 = b2, 'S1: recategorizar un producto sin ventas no debe alterar la tabla';
         INSERT INTO pedido (fecha, forma_pago, cliente_id) VALUES (v_ts2, 'EFECTIVO', 1) RETURNING id INTO v_q;
         INSERT INTO pedido_detalle (pedido_id, producto_id, cantidad, precio_unitario, subtotal) VALUES (v_q, v_p, 1, 25.00, 25.00);
-        ASSERT t4_vdc_total(v_d2, 2) = 25.00, 'S2: venta en la categoria 2';
-        UPDATE producto SET categoria_id = 3 WHERE id = v_p;
-        ASSERT t4_vdc_total(v_d2, 2) = 0 AND t4_vdc_total(v_d2, 3) = 25.00 AND t4_vdc_lineas(v_d2, 3) = 1, 'S3: la unica venta pasa a la categoria 3 y la fila de la 2 desaparece';
-        ASSERT NOT EXISTS (SELECT 1 FROM ventas_diarias_categoria WHERE fecha = v_d2 AND categoria_id = 2), 'S3b: la fila vacia debia borrarse';
+        ASSERT t4_vdc_total(v_d2, c2) = 25.00, 'S2: venta en la categoria 2';
+        UPDATE producto SET categoria_id = c3 WHERE id = v_p;
+        ASSERT t4_vdc_total(v_d2, c2) = 0 AND t4_vdc_total(v_d2, c3) = 25.00 AND t4_vdc_lineas(v_d2, c3) = 1, 'S3: la unica venta pasa a la categoria 3 y la fila de la 2 desaparece';
+        ASSERT NOT EXISTS (SELECT 1 FROM ventas_diarias_categoria WHERE fecha = v_d2 AND categoria_id = c2), 'S3b: la fila vacia debia borrarse';
         ASSERT (SELECT count(*) FROM v_auditoria_ventas_diarias) = 0, 'auditoria != 0 filas tras el escenario';
         RAISE EXCEPTION 'rollback' USING ERRCODE = 'T4RB1';
     EXCEPTION WHEN SQLSTATE 'T4RB1' THEN NULL;

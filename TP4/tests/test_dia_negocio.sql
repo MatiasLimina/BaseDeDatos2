@@ -23,6 +23,6 @@ BEGIN
     SET LOCAL TimeZone = 'UTC';
     ASSERT fn_dia_negocio('2026-10-19 00:30-03') = DATE '2026-10-19', 'medianoche BA mal asignada';
     ASSERT fn_dia_negocio('2026-10-18 23:59:59-03') = DATE '2026-10-18', 'ultimo segundo BA mal asignado';
-    -- Un instante UTC de la tarde de BA (14:00 UTC = 11:00 BA) sigue el mismo dia
+    -- Un instante de la madrugada UTC pertenece al dia ANTERIOR en BA (02:30 UTC del 18 = 23:30 del 17)
     ASSERT fn_dia_negocio('2026-10-18 02:30+00') = DATE '2026-10-17', '02:30 UTC es 23:30 del 17 en BA';
 END $$;
