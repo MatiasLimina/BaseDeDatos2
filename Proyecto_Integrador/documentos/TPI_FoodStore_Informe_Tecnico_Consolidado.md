@@ -536,6 +536,8 @@ flowchart TD
 
 El TP4 se desarrolló y validó sobre una copia de trabajo (`tp4_foodstore`, clon de la copia del TP3) y se integró aquí sin modificar `schema.sql`, `seed.sql` ni los scripts de los TP1 a TP3. El informe completo del TP4 está en [`informe_tp4.md`](informe_tp4.md) (PDF: [`informe_tp4.pdf`](informe_tp4.pdf); capturas y planes `EXPLAIN` en [`tp4_evidencias/`](tp4_evidencias/)); las 28 pruebas manuales, en [`TP4/pruebas_manuales.md`](../../TP4/pruebas_manuales.md). Aquí sólo se resume y se indica cómo ejecutarlo.
 
+> **Verificación de los archivos integrados.** Los archivos `Proyecto_Integrador/database/tp4_*.sql` se verificaron **sólo vía MCP, sentencia por sentencia** (no con `psql -f`): los `psql -v ON_ERROR_STOP=1 -f` que ejecutó el autor corresponden a los archivos originales de `TP4/`. **Sin probar:** el parseo de punta a punta con `psql` (bloques `$$`, `SET client_encoding`), la rama `CREATE INDEX` del bloque `DO` de índices (en `tp4_foodstore` ya existían) y el archivo de datos de prueba como unidad. Tres tests se corrieron en versión abreviada (`test_fnbc_descomposicion`, `test_fnbc_restricciones_indices`, `test_reversibilidad`) y `test_reversibilidad` no pudo completarse. La corrida completa recomendada está en 8.5.
+
 ### 8.1 Parte 1: Forma Normal de Boyce-Codd (`control_lote_almacen`)
 
 El esquema `R(LoteID, DepositoID, ResponsableControlID)` con clave `(LoteID, DepositoID)` está en 3FN pero no en FNBC: la dependencia `ResponsableControlID → DepositoID` tiene un determinante que no es superclave. Se descompone con el algoritmo de clase en `responsable_deposito(responsable_control_id PK, deposito_id)` y `control_lote(lote_id, responsable_control_id)`, ambas con claves foráneas `ON DELETE RESTRICT`. Una vista `v_control_lote_almacen` (reunión natural) reconstruye la relación original y una verificación `EXCEPT` en ambos sentidos devuelve 0 filas. Las anomalías de inserción, borrado y actualización desaparecen porque el hecho «el responsable pertenece a un depósito» se guarda una sola vez.
@@ -544,7 +546,7 @@ Costo: la dependencia `{Lote, Depósito} → Responsable` **no se preserva** (ni
 
 ### 8.2 Parte 2: desnormalización controlada (top 5 de categorías del día)
 
-La consulta normalizada recorre `pedido_detalle` (771 201 filas) para producir 10 totales. Se agregó la tabla redundante `ventas_diarias_categoria (fecha, categoria_id, total_vendido, cantidad_lineas, actualizado_en)`, mantenida por disparadores en la misma transacción que modifica la fuente (`trg_vdc_pedido_detalle`, `trg_vdc_pedido`, `trg_vdc_producto`, más dos `BEFORE TRUNCATE` que bloquean `TRUNCATE`), con carga inicial atómica y una vista de auditoría `v_auditoria_ventas_diarias` que debe devolver 0 filas.
+La consulta normalizada recorre `pedido_detalle` (771 201 filas en el clon `tp4_foodstore`) para producir 10 totales. Se agregó la tabla redundante `ventas_diarias_categoria (fecha, categoria_id, total_vendido, cantidad_lineas, actualizado_en)`, mantenida por disparadores en la misma transacción que modifica la fuente (`trg_vdc_pedido_detalle`, `trg_vdc_pedido`, `trg_vdc_producto`, más dos `BEFORE TRUNCATE` que bloquean `TRUNCATE`), con carga inicial atómica y una vista de auditoría `v_auditoria_ventas_diarias` que debe devolver 0 filas.
 
 | Medición (`EXPLAIN (ANALYZE, BUFFERS)`, corrida manual del autor, 2026-10-18) | Antes (normalizada) | Después (desnormalizada) |
 |---|---|---|
@@ -574,7 +576,12 @@ Todos están en `Proyecto_Integrador/database/` y no se sobrescribió ningún ar
 | [`tp4_datos_prueba_top_categorias.sql`](../database/tp4_datos_prueba_top_categorias.sql) | Datos de prueba masivos (~50 000 pedidos, ~150 000 detalles, 10 categorías). **SOLO EN COPIA / entornos de prueba** |
 | [`tests_tp4/`](../database/tests_tp4/) | 14 tests `DO $$ ... ASSERT ... $$`; los que modifican datos se revierten con una excepción centinela |
 
-Orden de ejecución, sobre una base ya creada con `schema.sql` (y `seed.sql`):
+**Prerrequisitos del generador de datos de prueba** (`tp4_datos_prueba_top_categorias.sql`; el SQL validado no se modificó, se documenta lo que supone):
+- **(a)** Requiere cargar antes `generar_registros_adaptado.sql`: supone 50 005 productos con ids contiguos 1 a 50 005, clientes existentes y que los productos 10 a 20 tengan categorías distintas tras la redistribución por `id % 10`.
+- **(b)** Con `triggers.sql` instalado puede abortar: `trg_verificar_cliente_activo` y `trg_verificar_producto_activo` rechazan clientes y productos inactivos, y `seed.sql` deja inactivos el cliente 3 y el producto 5. Hay que cargar los datos de prueba **sin** `triggers.sql` (o con esos triggers deshabilitados), como en `tp4_foodstore`.
+- **(c)** Con sólo `schema.sql` y `seed.sql` no genera detalles y la guarda anti-duplicado no se cumple: ese orden **no** es idempotente y no debe usarse.
+
+Orden de ejecución, sobre una base armada con `schema.sql`, `seed.sql` y `generar_registros_adaptado.sql`, **sin `triggers.sql`** durante la carga de datos de prueba (la secuencia completa y verificable está en 8.5):
 
 ```bash
 # 1. Parte 1 (independiente; hace DROP ... CASCADE de lote, deposito, usuario y sus tablas)
@@ -586,10 +593,32 @@ psql -v ON_ERROR_STOP=1 -d <base> -f Proyecto_Integrador/database/tp4_desnormali
 # 4. Tests (cada uno: psql -v ON_ERROR_STOP=1 -d <base> -f Proyecto_Integrador/database/tests_tp4/<test>.sql)
 ```
 
-Los tests `test_datos_prueba`, `test_reporte_top5`, `test_auditoria`, `test_ventas_diarias_estructura`, `test_trigger_detalle` y `test_trigger_pedido_producto` necesitan haber cargado el archivo de datos de prueba (y el script principal posterior); los demás funcionan con los datos reales. Siguiendo el [protocolo de seguridad](protocolo_seguridad.md), conviene ejecutar todo primero sobre una copia de trabajo.
+Los tests `test_datos_prueba`, `test_reporte_top5`, `test_auditoria`, `test_ventas_diarias_estructura`, `test_trigger_detalle`, `test_trigger_pedido_producto` y `test_reversibilidad` **requieren** haber cargado el archivo de datos de prueba y el script principal (sin ventas hoy `test_reversibilidad` falla por un `ASSERT` sobre `NULL` y usa el producto 10). `test_baja_logica` tiene fija la fecha de corte `2026-09-22` del clon `tp4_foodstore`: en otra base hay que ajustarla. Los tests `test_fnbc_*`, `test_dia_negocio` y `test_concurrencia` no dependen de los datos de prueba. Siguiendo el [protocolo de seguridad](protocolo_seguridad.md), conviene ejecutar todo primero sobre una copia de trabajo.
 
 ### 8.4 Integración con el esquema del integrador
 
 - **Columna `eliminado`:** no está en `schema.sql`; se agrega con `ALTER TABLE ... ADD COLUMN IF NOT EXISTS` en la sección 1 del script de la Parte 2. En PostgreSQL 11 o posterior es un cambio de catálogo sin reescritura de la tabla. Los procedimientos existentes (`sp_registrar_pedido`) no la nombran y usan el valor por defecto `FALSE`.
 - **Índices:** el TP3 definió `idx_pedido_fecha ON pedido(fecha)` e `idx_detalle_producto_id ON pedido_detalle(producto_id)`, que **no están en ningún script del integrador** (sólo se mencionan en la sección 5 de este informe). El script de la Parte 2 los crea sólo si no existe ya un índice B-tree válido, no parcial, que empiece por esa columna. El primero hace sargable el filtro por rango de día de la consulta normalizada y el segundo lo usa `trg_vdc_producto` al recategorizar un producto (la clave primaria `(pedido_id, producto_id)` no sirve para buscar por `producto_id`).
 - **Privilegios.** `protocolo_seguridad.md` y `views.sql` sólo definen `rol_reportes_foodstore` (lectura de `vw_pedidos_cliente`, sin acceso a las tablas base); ese rol no escribe, de modo que no se ve afectado. No hay un rol de aplicación que inserte detalles: `sp_registrar_pedido` corre con los privilegios de quien lo invoca (no es `SECURITY DEFINER`). Con los disparadores de la Parte 2, ese rol necesitaría, además de `INSERT` en `pedido` y `pedido_detalle`, `UPDATE` sobre `producto` (ya lo exige el procedimiento para el stock), **`UPDATE` sobre `pedido`** (porque `SELECT ... FOR SHARE` exige ese privilegio) y `INSERT`, `UPDATE` y `DELETE` sobre `ventas_diarias_categoria`. Si se restringen los privilegios del rol de aplicación, hay que otorgar esos permisos o declarar las funciones `fn_vdc_*` como `SECURITY DEFINER` con `search_path` fijo. Con los privilegios actuales (un único rol propietario) no hay problema.
+
+### 8.5 Corrida recomendada con `psql -f`
+
+Pendiente de ejecutar (los archivos integrados sólo se verificaron por MCP). Sobre una base descartable:
+
+```bash
+createdb tp4_integ_check
+for f in schema seed procedures views indices_parciales_soft_delete materializadas generar_registros_adaptado; do   # SIN triggers.sql
+  psql -v ON_ERROR_STOP=1 -d tp4_integ_check -f Proyecto_Integrador/database/$f.sql
+done
+psql -v ON_ERROR_STOP=1 -d tp4_integ_check -f Proyecto_Integrador/database/tp4_fnbc_control_lote.sql   # x2 (idempotencia)
+psql -v ON_ERROR_STOP=1 -d tp4_integ_check -f Proyecto_Integrador/database/tp4_fnbc_control_lote.sql
+psql -v ON_ERROR_STOP=1 -d tp4_integ_check -f Proyecto_Integrador/database/tp4_datos_prueba_top_categorias.sql
+psql -v ON_ERROR_STOP=1 -d tp4_integ_check -f Proyecto_Integrador/database/tp4_desnormalizacion_top_categorias.sql   # x2
+psql -v ON_ERROR_STOP=1 -d tp4_integ_check -f Proyecto_Integrador/database/tp4_desnormalizacion_top_categorias.sql
+psql -d tp4_integ_check -c '\di pedido*'      # un único índice por columna (fecha y producto_id)
+for t in Proyecto_Integrador/database/tests_tp4/test_*.sql; do   # los 14 tests
+  psql -v ON_ERROR_STOP=1 -d tp4_integ_check -f "$t"
+done
+```
+
+Si se instala `triggers.sql` **antes** de los datos de prueba, el comportamiento esperado es que la carga pueda abortar por `trg_verificar_cliente_activo` o `trg_verificar_producto_activo` (cliente 3 y producto 5 inactivos en `seed.sql`); en ese caso hay que deshabilitar esos triggers durante la carga y volver a habilitarlos después.

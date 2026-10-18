@@ -10,6 +10,21 @@
 -- con fecha del día de negocio actual (parte de ellos con eliminado = TRUE). Antes de ejecutarlo
 -- haga una copia de trabajo (ver documentos/protocolo_seguridad.md).
 --
+-- PRERREQUISITOS DEL GENERADOR (no cambian el SQL de abajo, sólo lo que supone):
+--  (a) Cargar ANTES generar_registros_adaptado.sql (con schema.sql y seed.sql). El generador de
+--      abajo supone 50 005 productos con ids contiguos 1..50005 (JOIN por
+--      1 + ((p.id * 7919 + k * 4719) % 50005)), clientes existentes y que los productos 10 a 20
+--      tengan categorías distintas tras la redistribución (id % 10) que usan los tests.
+--  (b) NO tener instalado triggers.sql durante la carga (o deshabilitar sus triggers):
+--      trg_verificar_cliente_activo y trg_verificar_producto_activo rechazan pedidos de clientes
+--      inactivos y detalles de productos inactivos, y seed.sql deja inactivos el cliente 3 y el
+--      producto 5; el generador los usa, así que con esos triggers la carga puede abortar.
+--      En tp4_foodstore no estaba triggers.sql instalado.
+--  (c) Con sólo schema.sql + seed.sql (sin generar_registros_adaptado.sql) NO funciona: el
+--      generador no encuentra los 50 005 productos, no genera detalles y la guarda anti-duplicado
+--      (>= 100 000 detalles de hoy) nunca se cumple, por lo que ese orden NO es idempotente y
+--      no debe usarse.
+--
 -- Orden recomendado (más rápido): ejecutar ESTE archivo ANTES de
 -- tp4_desnormalizacion_top_categorias.sql, así la carga masiva no paga el costo de los
 -- disparadores y la carga inicial (backfill) del script principal ya la recoge.
@@ -17,10 +32,12 @@
 -- totales sincronizados, pero es más lento); si se prefiere, re-ejecutar luego el script
 -- principal reconstruye los totales.
 -- Ejecución: psql -v ON_ERROR_STOP=1 -d <base_de_prueba> -f Proyecto_Integrador/database/tp4_datos_prueba_top_categorias.sql
--- Idempotente: guarda anti-duplicado por día de negocio (ver ATENCION en el bloque DO).
+-- Idempotente sólo cumpliendo (a): guarda anti-duplicado por día de negocio (ver ATENCION en el bloque DO).
+-- Verificación: este archivo se verificó SOLO sentencia por sentencia vía MCP (no con psql -f)
+-- y no como unidad (ver sección 8.5 del informe consolidado).
 -- Los tests test_datos_prueba, test_reporte_top5, test_auditoria, test_ventas_diarias_estructura,
--- test_trigger_detalle y test_trigger_pedido_producto (tests_tp4/) necesitan haber cargado
--- este archivo.
+-- test_trigger_detalle, test_trigger_pedido_producto y test_reversibilidad (tests_tp4/)
+-- REQUIEREN haber cargado este archivo.
 -- =====================================================================
 
 SET client_encoding = 'UTF8';

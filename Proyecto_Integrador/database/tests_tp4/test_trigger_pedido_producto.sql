@@ -1,5 +1,6 @@
 -- Test (Parte 2, grupo 8): disparadores trg_vdc_pedido (eliminado / fecha) y trg_vdc_producto (categoria_id).
 -- *** REQUIERE haber cargado Proyecto_Integrador/database/tp4_datos_prueba_top_categorias.sql (SOLO EN COPIA) ***
+-- (supone ademas que la base se armo con generar_registros_adaptado.sql y SIN triggers.sql; ver el encabezado del archivo de datos de prueba)
 -- Ejecutar: psql -v ON_ERROR_STOP=1 -d <base> -f Proyecto_Integrador/database/tests_tp4/test_trigger_pedido_producto.sql
 -- Requiere la seccion 4 de Proyecto_Integrador/database/tp4_desnormalizacion_top_categorias.sql (con disparadores instalados).
 -- Cada escenario va en un subbloque que termina con una excepcion centinela (SQLSTATE T4RB1) que

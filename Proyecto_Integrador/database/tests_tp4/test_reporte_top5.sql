@@ -1,5 +1,6 @@
 -- Test (Parte 2, grupo 9): v_top5_categorias_dia equivale a la consulta normalizada (filas, orden y montos).
 -- *** REQUIERE haber cargado Proyecto_Integrador/database/tp4_datos_prueba_top_categorias.sql (SOLO EN COPIA) ***
+-- (supone ademas que la base se armo con generar_registros_adaptado.sql y SIN triggers.sql; ver el encabezado del archivo de datos de prueba)
 -- Ejecutar: psql -v ON_ERROR_STOP=1 -d <base> -f Proyecto_Integrador/database/tests_tp4/test_reporte_top5.sql
 -- Requiere la seccion 5 de Proyecto_Integrador/database/tp4_desnormalizacion_top_categorias.sql.
 -- La parte que modifica datos se revierte con una excepcion centinela (SQLSTATE T4RB1).

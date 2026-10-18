@@ -1,4 +1,5 @@
 -- Test (Parte 2, grupo 6): baja logica `eliminado` en pedido y pedido_detalle.
+-- NOTA: la fecha de corte 2026-09-22 (fin del historico original) esta FIJA en el test y corresponde al clon tp4_foodstore; en otra base hay que ajustarla.
 -- Ejecutar: psql -v ON_ERROR_STOP=1 -d <base> -f Proyecto_Integrador/database/tests_tp4/test_baja_logica.sql
 -- Requiere Proyecto_Integrador/database/tp4_desnormalizacion_top_categorias.sql (seccion 1). Es re-ejecutable tras la carga de
 -- datos de prueba y en cualquier dia posterior: el "historico original" se define por la fecha maxima de

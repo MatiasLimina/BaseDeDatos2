@@ -1,4 +1,6 @@
 -- Test (Parte 2, grupo 8): la desnormalizacion se retira sin perder ni modificar la fuente.
+-- *** REQUIERE haber cargado Proyecto_Integrador/database/tp4_datos_prueba_top_categorias.sql (SOLO EN COPIA) ***
+-- (sin ventas hoy falla por ASSERT sobre NULL; usa el producto 10 y requiere que no haya vistas dependientes de ventas_diarias_categoria)
 -- Ejecutar: psql -v ON_ERROR_STOP=1 -d <base> -f Proyecto_Integrador/database/tests_tp4/test_reversibilidad.sql
 -- Requiere la seccion 4 (y 5/6 si ya existen) de Proyecto_Integrador/database/tp4_desnormalizacion_top_categorias.sql.
 -- El bloque de reversion es una COPIA del que figura (comentado) en la seccion 7 del script (no se puede

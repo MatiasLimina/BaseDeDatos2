@@ -1,5 +1,6 @@
 -- Test (Parte 2, grupo 10): v_auditoria_ventas_diarias detecta toda desincronizacion.
 -- *** REQUIERE haber cargado Proyecto_Integrador/database/tp4_datos_prueba_top_categorias.sql (SOLO EN COPIA) ***
+-- (supone ademas que la base se armo con generar_registros_adaptado.sql y SIN triggers.sql; ver el encabezado del archivo de datos de prueba)
 -- Ejecutar: psql -v ON_ERROR_STOP=1 -d <base> -f Proyecto_Integrador/database/tests_tp4/test_auditoria.sql
 -- Requiere la seccion 6 de Proyecto_Integrador/database/tp4_desnormalizacion_top_categorias.sql. Las alteraciones manuales se
 -- hacen dentro de subbloques que terminan con una excepcion centinela (SQLSTATE T4RB1).

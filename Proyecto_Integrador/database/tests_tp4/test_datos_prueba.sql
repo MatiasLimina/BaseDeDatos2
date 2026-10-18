@@ -1,5 +1,6 @@
 -- Test (Parte 2, grupo 6): datos de prueba del dia de negocio actual.
 -- *** REQUIERE haber cargado Proyecto_Integrador/database/tp4_datos_prueba_top_categorias.sql (SOLO EN COPIA) ***
+-- (supone ademas que la base se armo con generar_registros_adaptado.sql y SIN triggers.sql; ver el encabezado del archivo de datos de prueba)
 -- Ejecutar: psql -v ON_ERROR_STOP=1 -d <base> -f Proyecto_Integrador/database/tests_tp4/test_datos_prueba.sql
 -- Requiere Proyecto_Integrador/database/tp4_datos_prueba_top_categorias.sql.
 DO $$
