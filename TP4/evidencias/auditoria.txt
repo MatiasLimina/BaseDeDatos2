@@ -2,6 +2,8 @@
 -- Ejecutada (a) tras la carga inicial y (b) despues de correr todos los tests de disparadores
 -- (cada uno revierte sus datos). Resultado en ambos casos: 0 filas.
 --
+-- Origen: salida de la consulta ejecutada mediante el MCP `postgres` (herramienta `query`), NO desde una
+-- sesion psql; el formato tabular de abajo es una transcripcion (resultado real: rowCount = 0).
 -- tp4_foodstore=> SELECT * FROM v_auditoria_ventas_diarias ORDER BY fecha, categoria_id;
 --  fecha | categoria_id | total_fuente | total_tabla | lineas_fuente | lineas_tabla
 -- -------+--------------+--------------+-------------+---------------+--------------
