@@ -34,6 +34,7 @@
 5. [Eje 4: Laboratorio de Optimización de Consultas (Antes vs. Después)](#5-eje-4-laboratorio-de-optimización-de-consultas-antes-vs-después)
 6. [Eje 5: Declaración de Uso de Inteligencia Artificial (DUIA Unificado)](#6-eje-5-declaración-de-uso-de-inteligencia-artificial-duia-unificado)
 7. [Conclusiones y Próximos Pasos](#7-conclusiones-y-próximos-pasos)
+8. [Extensión TP4: FNBC y desnormalización controlada](#8-extensión-tp4-fnbc-y-desnormalización-controlada)
 
 ---
 
@@ -528,3 +529,67 @@ flowchart TD
 2. **Robustez y Resiliencia:** La arquitectura combina restricciones declarativas (`CHECK`, `UNIQUE`, `FOREIGN KEY`), objetos programables PL/pgSQL transaccionales (`FOR UPDATE`, `CALL`) e índices parciales para soft-delete.
 3. **Optimización Comprobada:** Las mediciones con `EXPLAIN ANALYZE` evidencian reducciones de tiempo de hasta **99.99%** en consultas críticas de alta concurrencia.
 4. **Preparación para Etapas Futuras:** El modelo y los scripts quedan consolidados en el directorio [`Proyecto_Integrador/`](file:///d:/A_Universidad/Tercer%20semestre/Base%20de%20Datos%202/BaseDeDatos2/Proyecto_Integrador/) listos para su ampliación en las unidades posteriores de la materia.
+
+---
+
+## 8. Extensión TP4: FNBC y desnormalización controlada
+
+El TP4 se desarrolló y validó sobre una copia de trabajo (`tp4_foodstore`, clon de la copia del TP3) y se integró aquí sin modificar `schema.sql`, `seed.sql` ni los scripts de los TP1 a TP3. El informe completo del TP4 está en [`informe_tp4.md`](informe_tp4.md) (PDF: [`informe_tp4.pdf`](informe_tp4.pdf); capturas y planes `EXPLAIN` en [`tp4_evidencias/`](tp4_evidencias/)); las 28 pruebas manuales, en [`TP4/pruebas_manuales.md`](../../TP4/pruebas_manuales.md). Aquí sólo se resume y se indica cómo ejecutarlo.
+
+### 8.1 Parte 1: Forma Normal de Boyce-Codd (`control_lote_almacen`)
+
+El esquema `R(LoteID, DepositoID, ResponsableControlID)` con clave `(LoteID, DepositoID)` está en 3FN pero no en FNBC: la dependencia `ResponsableControlID → DepositoID` tiene un determinante que no es superclave. Se descompone con el algoritmo de clase en `responsable_deposito(responsable_control_id PK, deposito_id)` y `control_lote(lote_id, responsable_control_id)`, ambas con claves foráneas `ON DELETE RESTRICT`. Una vista `v_control_lote_almacen` (reunión natural) reconstruye la relación original y una verificación `EXCEPT` en ambos sentidos devuelve 0 filas. Las anomalías de inserción, borrado y actualización desaparecen porque el hecho «el responsable pertenece a un depósito» se guarda una sola vez.
+
+Costo: la dependencia `{Lote, Depósito} → Responsable` **no se preserva** (ninguna clave local la impone) y el esquema descompuesto acepta dos responsables del mismo depósito para un lote. Se documenta y se demuestra en una transacción revertida; por decisión de diseño no se impone con disparador.
+
+### 8.2 Parte 2: desnormalización controlada (top 5 de categorías del día)
+
+La consulta normalizada recorre `pedido_detalle` (771 201 filas) para producir 10 totales. Se agregó la tabla redundante `ventas_diarias_categoria (fecha, categoria_id, total_vendido, cantidad_lineas, actualizado_en)`, mantenida por disparadores en la misma transacción que modifica la fuente (`trg_vdc_pedido_detalle`, `trg_vdc_pedido`, `trg_vdc_producto`, más dos `BEFORE TRUNCATE` que bloquean `TRUNCATE`), con carga inicial atómica y una vista de auditoría `v_auditoria_ventas_diarias` que debe devolver 0 filas.
+
+| Medición (`EXPLAIN (ANALYZE, BUFFERS)`, corrida manual del autor, 2026-10-18) | Antes (normalizada) | Después (desnormalizada) |
+|---|---|---|
+| Execution Time | **139,769 ms** | **0,112 ms** |
+| Plan | recorre `pedido_detalle` y une con `pedido` y `producto` | lectura por clave primaria de ≈ 10 filas |
+
+Las mediciones automatizadas (mediana de tres ejecuciones) dieron 141,857 ms y 0,101 ms; la conclusión (orden de magnitud y cambio de plan, ≈ 1 250 a 1 400 veces menos) es la misma. No se midió el sobrecosto de escritura de los disparadores.
+
+**Decisiones de diseño.**
+- Tabla de totales con disparadores y no vista materializada: el reporte es «en tiempo real» y una vista materializada sólo es exacta justo después de `REFRESH`, que recalcula todo el histórico.
+- Baja lógica `eliminado BOOLEAN NOT NULL DEFAULT FALSE` en `pedido` y `pedido_detalle` (se agrega con `ALTER ... IF NOT EXISTS`, no en `schema.sql`); una línea cuenta sólo si ni ella ni su pedido están eliminados.
+- «Día» = fecha calendario de `pedido.fecha` en `America/Argentina/Buenos_Aires` (`fn_dia_negocio`, `IMMUTABLE`), independiente de la zona de la sesión.
+- La categoría **no** se congela al vender: se usa la categoría actual del producto, igual que la consulta de origen; recategorizar un producto con mucho historial es costoso pero infrecuente.
+- `total_vendido NUMERIC(14,2)` (agregado; excepción justificada a `NUMERIC(10,2)`), clave primaria natural `(fecha, categoria_id)` y borrado de la fila al llegar a 0 líneas.
+- Reversible sin tocar la fuente (`DROP` de disparadores, funciones y tabla; bloque comentado en la sección 7 del script, verificado por `test_reversibilidad.sql`).
+
+**Limitaciones de concurrencia.** Para que una baja de pedido o una recategorización concurrente con la inserción de un detalle no deje un total de más, `fn_vdc_linea` lee `pedido` y `producto` con `FOR SHARE` (también si el pedido ya está eliminado). La garantía se limita a los escenarios analizados en `READ COMMITTED` (baja y reactivación, en ambos órdenes de llegada). Costos y límites: contención con `UPDATE producto SET stock` y deadlocks posibles (PostgreSQL aborta una transacción y se reintenta); fila caliente `(día, categoría)` bajo muchas ventas simultáneas; carrera residual entre baja o cambio de fecha de un pedido y recategorización de un producto de ese pedido (mitigación: `SERIALIZABLE` o auditoría y reconstrucción); caso exótico de CTE modificante. La verificación automática es estructural; la espera real se probó a mano con dos sesiones (prueba 27 de las pruebas manuales; variante 1 ejecutada, variantes 2 a 4 pendientes). La auditoría es la red de seguridad y la reconstrucción consiste en re-ejecutar el script principal.
+
+### 8.3 Archivos nuevos y cómo ejecutarlos
+
+Todos están en `Proyecto_Integrador/database/` y no se sobrescribió ningún archivo anterior.
+
+| Archivo | Contenido |
+|---|---|
+| [`tp4_fnbc_control_lote.sql`](../database/tp4_fnbc_control_lote.sql) | Parte 1: tablas `lote`, `deposito`, `usuario`, `control_lote_almacen` (original), `responsable_deposito`, `control_lote`, vista y migración |
+| [`tp4_desnormalizacion_top_categorias.sql`](../database/tp4_desnormalizacion_top_categorias.sql) | Parte 2: columna `eliminado`, índices prerrequisito, `fn_dia_negocio`, tabla de totales, disparadores, carga inicial, reporte, auditoría, reversión (comentada) |
+| [`tp4_datos_prueba_top_categorias.sql`](../database/tp4_datos_prueba_top_categorias.sql) | Datos de prueba masivos (~50 000 pedidos, ~150 000 detalles, 10 categorías). **SOLO EN COPIA / entornos de prueba** |
+| [`tests_tp4/`](../database/tests_tp4/) | 14 tests `DO $$ ... ASSERT ... $$`; los que modifican datos se revierten con una excepción centinela |
+
+Orden de ejecución, sobre una base ya creada con `schema.sql` (y `seed.sql`):
+
+```bash
+# 1. Parte 1 (independiente; hace DROP ... CASCADE de lote, deposito, usuario y sus tablas)
+psql -v ON_ERROR_STOP=1 -d <base> -f Proyecto_Integrador/database/tp4_fnbc_control_lote.sql
+# 2. (solo en una copia de prueba) datos de prueba masivos, ANTES de instalar la desnormalización
+psql -v ON_ERROR_STOP=1 -d <base_de_prueba> -f Proyecto_Integrador/database/tp4_datos_prueba_top_categorias.sql
+# 3. Parte 2 (idempotente; re-ejecutarlo reconstruye los totales)
+psql -v ON_ERROR_STOP=1 -d <base> -f Proyecto_Integrador/database/tp4_desnormalizacion_top_categorias.sql
+# 4. Tests (cada uno: psql -v ON_ERROR_STOP=1 -d <base> -f Proyecto_Integrador/database/tests_tp4/<test>.sql)
+```
+
+Los tests `test_datos_prueba`, `test_reporte_top5`, `test_auditoria`, `test_ventas_diarias_estructura`, `test_trigger_detalle` y `test_trigger_pedido_producto` necesitan haber cargado el archivo de datos de prueba (y el script principal posterior); los demás funcionan con los datos reales. Siguiendo el [protocolo de seguridad](protocolo_seguridad.md), conviene ejecutar todo primero sobre una copia de trabajo.
+
+### 8.4 Integración con el esquema del integrador
+
+- **Columna `eliminado`:** no está en `schema.sql`; se agrega con `ALTER TABLE ... ADD COLUMN IF NOT EXISTS` en la sección 1 del script de la Parte 2. En PostgreSQL 11 o posterior es un cambio de catálogo sin reescritura de la tabla. Los procedimientos existentes (`sp_registrar_pedido`) no la nombran y usan el valor por defecto `FALSE`.
+- **Índices:** el TP3 definió `idx_pedido_fecha ON pedido(fecha)` e `idx_detalle_producto_id ON pedido_detalle(producto_id)`, que **no están en ningún script del integrador** (sólo se mencionan en la sección 5 de este informe). El script de la Parte 2 los crea sólo si no existe ya un índice B-tree válido, no parcial, que empiece por esa columna. El primero hace sargable el filtro por rango de día de la consulta normalizada y el segundo lo usa `trg_vdc_producto` al recategorizar un producto (la clave primaria `(pedido_id, producto_id)` no sirve para buscar por `producto_id`).
+- **Privilegios.** `protocolo_seguridad.md` y `views.sql` sólo definen `rol_reportes_foodstore` (lectura de `vw_pedidos_cliente`, sin acceso a las tablas base); ese rol no escribe, de modo que no se ve afectado. No hay un rol de aplicación que inserte detalles: `sp_registrar_pedido` corre con los privilegios de quien lo invoca (no es `SECURITY DEFINER`). Con los disparadores de la Parte 2, ese rol necesitaría, además de `INSERT` en `pedido` y `pedido_detalle`, `UPDATE` sobre `producto` (ya lo exige el procedimiento para el stock), **`UPDATE` sobre `pedido`** (porque `SELECT ... FOR SHARE` exige ese privilegio) y `INSERT`, `UPDATE` y `DELETE` sobre `ventas_diarias_categoria`. Si se restringen los privilegios del rol de aplicación, hay que otorgar esos permisos o declarar las funciones `fn_vdc_*` como `SECURITY DEFINER` con `search_path` fijo. Con los privilegios actuales (un único rol propietario) no hay problema.
