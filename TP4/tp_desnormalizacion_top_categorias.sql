@@ -66,6 +66,9 @@ WHERE  c.rn = p.id % 10
 -- pedido_detalle es (pedido_id, producto_id)); subtotal = cantidad * precio_unitario;
 -- 1 de cada 20 pedidos y ~1 de cada 25 detalles quedan con eliminado = TRUE para que el filtro
 -- de baja logica tenga efecto. Los datos dependen del dia de ejecucion (ver informe).
+-- ATENCION: la guarda cuenta los detalles vigentes del dia de negocio ACTUAL. Si el script se
+-- re-ejecuta al dia siguiente (otro dia de negocio) la guarda no encuentra datos "de hoy" y
+-- AGREGA otros ~50 000 pedidos / ~150 000 detalles; el volumen acumulado crece una vez por dia.
 DO $$
 DECLARE
     v_ini      TIMESTAMPTZ := (fn_dia_negocio(now())::timestamp) AT TIME ZONE 'America/Argentina/Buenos_Aires';
@@ -139,14 +142,23 @@ LIMIT  5;
 DROP VIEW     IF EXISTS v_top5_categorias_dia;
 DROP VIEW     IF EXISTS v_auditoria_ventas_diarias;
 
+-- Desviaciones deliberadas de las directivas de AGENTS.md (justificadas):
+--  * PK compuesta natural (fecha, categoria_id) en lugar de `BIGINT GENERATED ALWAYS AS IDENTITY`:
+--    la tabla es un agregado cuya identidad ES el par (dia, categoria); la clave natural es la que
+--    habilita el upsert INSERT ... ON CONFLICT (fecha, categoria_id) y el filtro `fecha = hoy` por
+--    prefijo de indice; una clave subrogada exigiria ademas un UNIQUE(fecha, categoria_id).
+--  * `fecha` es DATE (dia de negocio) y no `TIMESTAMPTZ NOT NULL DEFAULT now()`: no representa un
+--    instante de alta sino la clave de agregacion (el instante de la ultima actualizacion esta en
+--    `actualizado_en`, que si es TIMESTAMPTZ NOT NULL DEFAULT now()).
+--  * `total_vendido` es NUMERIC(14,2) y no NUMERIC(10,2) (ver mas abajo).
 CREATE TABLE IF NOT EXISTS ventas_diarias_categoria (
     fecha           DATE          NOT NULL,   -- dia de negocio (fn_dia_negocio) de pedido.fecha
     -- Se guarda categoria_id y no el nombre: el nombre puede cambiar (y es UNIQUE, por lo que
     -- agrupar por id equivale a agrupar por nombre). El reporte une con categoria (<= 10 filas).
     categoria_id    BIGINT        NOT NULL,
-    -- NUMERIC(14,2) y no (10,2): es un AGREGADO (suma de >= 100 000 lineas por dia/categoria,
-    -- ~2e8 en los datos de prueba) y NUMERIC(10,2) se desbordaria en 99 999 999,99. Excepcion
-    -- justificada a la regla de montos del proyecto.
+    -- NUMERIC(14,2) y no (10,2): es un AGREGADO (en los datos de prueba, ~15 000 lineas por
+    -- categoria y dia con subtotales de miles suman ~1e8-2e8) y NUMERIC(10,2) se desbordaria en
+    -- 99 999 999,99. Excepcion justificada a la regla de montos del proyecto.
     total_vendido   NUMERIC(14,2) NOT NULL,
     -- Permite borrar la fila al llegar a 0 lineas: un total 0 no distingue "sin ventas" de
     -- "ventas de subtotal 0", y asi la tabla coincide con la consulta normalizada.
@@ -223,7 +235,8 @@ DECLARE
 BEGIN
     SELECT fn_dia_negocio(p.fecha), pr.categoria_id INTO v_fecha, v_cat
     FROM   pedido p, producto pr
-    WHERE  p.id = p_pedido_id AND pr.id = p_producto_id AND NOT p.eliminado;
+    WHERE  p.id = p_pedido_id AND pr.id = p_producto_id AND NOT p.eliminado
+    FOR SHARE OF p, pr;                 -- ver "CONCURRENCIA" mas abajo: cierra la carrera detalle vs pedido/producto
     IF FOUND THEN                       -- un pedido eliminado no aporta lineas
         PERFORM fn_vdc_aplicar(v_fecha, v_cat, p_signo * p_subtotal, p_signo);
     END IF;
@@ -302,17 +315,87 @@ BEGIN
     RETURN NULL;
 END $$;
 
+-- TRUNCATE de pedido / pedido_detalle no dispara disparadores de fila y dejaria la tabla de totales
+-- desincronizada sin aviso: se bloquea con un disparador BEFORE TRUNCATE que aborta la sentencia
+-- (decision: es barato y evita el error silencioso; para vaciar las fuentes use DELETE, que si
+-- sincroniza, o desinstale primero la desnormalizacion con la seccion 7). `producto` no necesita
+-- guarda: las FK de pedido_detalle impiden TRUNCATE producto sin CASCADE.
+CREATE OR REPLACE FUNCTION fn_vdc_bloquear_truncate() RETURNS TRIGGER
+LANGUAGE plpgsql
+AS $$
+BEGIN
+    RAISE EXCEPTION 'TRUNCATE de % no permitido: ventas_diarias_categoria no se puede sincronizar con TRUNCATE; use DELETE o reconstruya los totales (ver seccion 4 del script)', TG_TABLE_NAME
+        USING ERRCODE = 'feature_not_supported';
+END $$;
+
+-- -----------------------------------------------------------------------------
+-- CONCURRENCIA (analisis completo; ver tambien design.md decision 14 e informe, punto c)
+--
+-- 1. Escenario sin proteccion (READ COMMITTED, lectura sin bloqueo en fn_vdc_linea):
+--      T1: UPDATE pedido SET eliminado = TRUE WHERE id = 7;
+--          -> trg_vdc_pedido lee los detalles del pedido 7 (los que ve su sentencia) y RESTA su aporte.
+--      T2 (a la vez): INSERT INTO pedido_detalle (pedido_id = 7, ...);
+--          -> trg_vdc_pedido_detalle lee el pedido 7: como T1 aun no hizo commit, lo ve con
+--             eliminado = FALSE y SUMA la linea.
+--      Ambas hacen commit. Resultado: pedido eliminado pero con una linea sumada que nadie resto
+--      (T1 no vio el detalle de T2 y T2 no vio la baja de T1): total de mas, auditoria != 0.
+--    Analogo con producto: T1 cambia producto.categoria_id mientras T2 inserta un detalle de ese
+--    producto (T2 suma en la categoria vieja y T1 no movio esa linea).
+--
+-- 2. Por que los bloqueos existentes no lo evitan: el INSERT en pedido_detalle toma, por las FK,
+--    FOR KEY SHARE sobre la fila de pedido y sobre la de producto; el UPDATE de pedido.eliminado /
+--    fecha y de producto.categoria_id toma FOR NO KEY UPDATE (no modifican columnas de clave).
+--    FOR KEY SHARE y FOR NO KEY UPDATE son COMPATIBLES: ninguna transaccion espera a la otra.
+--
+-- 3. Que cierra FOR SHARE OF p, pr en fn_vdc_linea: FOR SHARE SI conflicta con FOR NO KEY UPDATE.
+--    Cuando el disparador del detalle lee pedido y producto toma ese bloqueo y lo conserva hasta el
+--    commit de T2. Si T1 llega despues, su UPDATE espera a T2 y, al despertar, su disparador
+--    (con snapshot nuevo, READ COMMITTED) ya ve el detalle de T2 y lo resta. Si T1 llego primero,
+--    T2 espera a T1 y al despertar la fila de pedido re-evaluada tiene eliminado = TRUE: no suma.
+--    En ambos ordenes el resultado es correcto.
+--
+-- 4. Costo: (a) contencion: mientras dura la transaccion que inserta/modifica el detalle, las filas
+--    de pedido y producto leidas quedan bloqueadas contra UPDATE; en particular un
+--    UPDATE producto SET stock = ... concurrente espera a que terminen las ventas en curso de ese
+--    producto. (b) deadlocks posibles: dos ventas del mismo producto que hacen primero INSERT
+--    (cada una con FOR SHARE) y despues UPDATE producto SET stock (que necesita FOR NO KEY UPDATE)
+--    se esperan mutuamente. Mitigacion: la aplicacion debe actualizar el stock ANTES de insertar
+--    detalles (toma primero el bloqueo fuerte) o ordenar siempre igual los productos; PostgreSQL
+--    detecta el deadlock y aborta una transaccion, que se reintenta. (c) fila caliente: ventas
+--    simultaneas de la misma categoria el mismo dia se serializan en la fila (fecha, categoria) de
+--    ventas_diarias_categoria hasta el commit (mitigacion futura: contadores fragmentados); con
+--    categorias tocadas en orden inverso tambien puede haber deadlock.
+--
+-- 5. Carrera residual (NO cerrada): baja logica / cambio de fecha de un PEDIDO vs recategorizacion
+--    de un PRODUCTO que ese pedido contiene. trg_vdc_pedido y trg_vdc_producto leen sin bloquearse
+--    mutuamente: el primero resta de la categoria vieja y el segundo, que no ve la baja sin commit,
+--    mueve esa misma linea de la vieja a la nueva. Es una operacion administrativa muy poco
+--    frecuente; mitigaciones: ejecutar ambas operaciones en transacciones SERIALIZABLE (una aborta
+--    con error de serializacion y se reintenta) o aceptar la ventana y detectarla con la
+--    auditoria (seccion 6) y reconstruir (punto 7).
+--
+-- 6. Caso exotico no soportado: sentencia con CTE modificante que cambia pedido.eliminado y
+--    inserta detalles del mismo pedido en UNA sola sentencia (WITH u AS (UPDATE pedido ...) INSERT
+--    INTO pedido_detalle ...). Los disparadores AFTER corren al final, con la baja ya visible:
+--    trg_vdc_pedido_detalle no suma las lineas nuevas pero trg_vdc_pedido las resta como si
+--    estuvieran sumadas; la sentencia aborta con "desincronizada" si falta la fila o, si no, la
+--    auditoria lo detecta. Se evita separando la baja y el alta en sentencias distintas.
+--
+-- 7. Reconstruccion (si la auditoria devuelve filas): volver a ejecutar el bloque de instalacion
+--    de abajo (LOCK + TRUNCATE ventas_diarias_categoria + carga inicial), que es idempotente y
+--    deja la tabla igual a la fuente. Mientras corre, las escrituras en las fuentes esperan.
+--
+-- 8. Garantia: con el bloqueo FOR SHARE y los disparadores, la tabla queda consistente para las
+--    operaciones soportadas en READ COMMITTED; NO es una garantia absoluta (puntos 5 y 6). La
+--    auditoria es la red de seguridad.
+-- -----------------------------------------------------------------------------
+
 -- Instalacion atomica: bloqueo + disparadores + carga inicial en UNA transaccion (un bloque DO es
 -- una sola sentencia/transaccion, tambien via un cliente que ejecuta de a una sentencia).
 -- SHARE ROW EXCLUSIVE bloquea escrituras concurrentes en las tres tablas fuente hasta el commit
 -- (las lecturas siguen permitidas): ninguna venta puede quedar fuera de la carga inicial ni de los
--- disparadores. La carga recalcula TODO el historico por fn_dia_negocio y categoria actual.
---
--- Concurrencia en operacion normal: dos transacciones que venden la misma categoria el mismo dia
--- serializan sobre la fila caliente (fecha, categoria) hasta el commit (aceptado para el volumen del
--- TP; mitigacion futura: contadores fragmentados). Si dos transacciones tocan categorias A y B en
--- orden inverso puede haber interbloqueo: PostgreSQL aborta una y la aplicacion reintenta.
--- TRUNCATE de las tablas fuente NO esta sincronizado (la auditoria lo detectaria).
+-- disparadores durante la instalacion. La carga recalcula TODO el historico por fn_dia_negocio y
+-- categoria actual. (La concurrencia en operacion normal se analiza arriba.)
 DO $$
 BEGIN
     LOCK TABLE pedido, pedido_detalle, producto IN SHARE ROW EXCLUSIVE MODE;
@@ -320,6 +403,8 @@ BEGIN
     DROP TRIGGER IF EXISTS trg_vdc_pedido_detalle ON pedido_detalle;
     DROP TRIGGER IF EXISTS trg_vdc_pedido         ON pedido;
     DROP TRIGGER IF EXISTS trg_vdc_producto       ON producto;
+    DROP TRIGGER IF EXISTS trg_vdc_truncate_pedido  ON pedido;
+    DROP TRIGGER IF EXISTS trg_vdc_truncate_detalle ON pedido_detalle;
 
     CREATE TRIGGER trg_vdc_pedido_detalle
         AFTER INSERT OR UPDATE OF subtotal, producto_id, pedido_id, eliminado OR DELETE
@@ -337,6 +422,14 @@ BEGIN
         FOR EACH ROW
         WHEN (OLD.categoria_id IS DISTINCT FROM NEW.categoria_id)
         EXECUTE FUNCTION fn_vdc_trg_producto();
+
+    CREATE TRIGGER trg_vdc_truncate_pedido
+        BEFORE TRUNCATE ON pedido
+        FOR EACH STATEMENT EXECUTE FUNCTION fn_vdc_bloquear_truncate();
+
+    CREATE TRIGGER trg_vdc_truncate_detalle
+        BEFORE TRUNCATE ON pedido_detalle
+        FOR EACH STATEMENT EXECUTE FUNCTION fn_vdc_bloquear_truncate();
 
     TRUNCATE ventas_diarias_categoria;
     INSERT INTO ventas_diarias_categoria (fecha, categoria_id, total_vendido, cantidad_lineas)
@@ -410,9 +503,12 @@ SELECT * FROM v_auditoria_ventas_diarias ORDER BY fecha, categoria_id;
 -- DROP TRIGGER IF EXISTS trg_vdc_pedido_detalle ON pedido_detalle;
 -- DROP TRIGGER IF EXISTS trg_vdc_pedido         ON pedido;
 -- DROP TRIGGER IF EXISTS trg_vdc_producto       ON producto;
+-- DROP TRIGGER IF EXISTS trg_vdc_truncate_pedido  ON pedido;
+-- DROP TRIGGER IF EXISTS trg_vdc_truncate_detalle ON pedido_detalle;
 -- DROP FUNCTION IF EXISTS fn_vdc_trg_detalle();
 -- DROP FUNCTION IF EXISTS fn_vdc_trg_pedido();
 -- DROP FUNCTION IF EXISTS fn_vdc_trg_producto();
+-- DROP FUNCTION IF EXISTS fn_vdc_bloquear_truncate();
 -- DROP FUNCTION IF EXISTS fn_vdc_linea(BIGINT, BIGINT, NUMERIC, INTEGER);
 -- DROP FUNCTION IF EXISTS fn_vdc_pedido_aplicar(BIGINT, TIMESTAMPTZ, INTEGER);
 -- DROP FUNCTION IF EXISTS fn_vdc_aplicar(DATE, BIGINT, NUMERIC, INTEGER);

@@ -1,7 +1,8 @@
 -- Test (Parte 2, grupo 8): la desnormalizacion se retira sin perder ni modificar la fuente.
 -- Ejecutar: psql -v ON_ERROR_STOP=1 -d tp4_foodstore -f TP4/tests/test_reversibilidad.sql
 -- Requiere la seccion 4 (y 5/6 si ya existen) de TP4/tp_desnormalizacion_top_categorias.sql.
--- El bloque de reversion es el mismo que figura (comentado) en la seccion 7 del script; aqui se
+-- El bloque de reversion es una COPIA del que figura (comentado) en la seccion 7 del script (no se puede
+-- leer el archivo desde SQL sin privilegios de superusuario; si cambia uno hay que cambiar el otro). Aqui se
 -- ejecuta dentro de un subbloque que termina con una excepcion centinela (T4RB1): al final todo
 -- vuelve a existir, sin cambios.
 DO $$
@@ -31,9 +32,12 @@ BEGIN
         DROP TRIGGER IF EXISTS trg_vdc_pedido_detalle ON pedido_detalle;
         DROP TRIGGER IF EXISTS trg_vdc_pedido         ON pedido;
         DROP TRIGGER IF EXISTS trg_vdc_producto       ON producto;
+        DROP TRIGGER IF EXISTS trg_vdc_truncate_pedido  ON pedido;
+        DROP TRIGGER IF EXISTS trg_vdc_truncate_detalle ON pedido_detalle;
         DROP FUNCTION IF EXISTS fn_vdc_trg_detalle();
         DROP FUNCTION IF EXISTS fn_vdc_trg_pedido();
         DROP FUNCTION IF EXISTS fn_vdc_trg_producto();
+        DROP FUNCTION IF EXISTS fn_vdc_bloquear_truncate();
         DROP FUNCTION IF EXISTS fn_vdc_linea(BIGINT, BIGINT, NUMERIC, INTEGER);
         DROP FUNCTION IF EXISTS fn_vdc_pedido_aplicar(BIGINT, TIMESTAMPTZ, INTEGER);
         DROP FUNCTION IF EXISTS fn_vdc_aplicar(DATE, BIGINT, NUMERIC, INTEGER);
@@ -72,5 +76,5 @@ BEGIN
     -- tras el rollback del subbloque todo vuelve a existir
     ASSERT to_regclass('ventas_diarias_categoria') IS NOT NULL, 'el rollback no restauro la tabla';
     SELECT count(*) INTO v_n FROM pg_trigger WHERE tgname LIKE 'trg\_vdc\_%' AND NOT tgisinternal;
-    ASSERT v_n = 3, 'tras el rollback debian existir 3 disparadores, hay ' || v_n;
+    ASSERT v_n = 5, 'tras el rollback debian existir 5 disparadores, hay ' || v_n;
 END $$;
