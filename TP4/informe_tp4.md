@@ -182,3 +182,26 @@ Todo pasa por `fn_vdc_aplicar`: con delta positivo hace `INSERT ... ON CONFLICT 
 **Concurrencia.** Dos transacciones que venden la misma categoría el mismo día se serializan en la fila caliente hasta el commit (aceptado al volumen del TP; mitigación futura: contadores fragmentados). Si dos transacciones tocan las categorías A y B en orden inverso puede haber interbloqueo: PostgreSQL aborta una y la aplicación reintenta. `TRUNCATE` de las tablas fuente no está sincronizado (la auditoría lo detectaría). Recategorizar un producto con mucho historial es costoso (usa `idx_detalle_producto_id`, que viene del TP3 y no está en `schema.sql` del integrador).
 
 **Carga inicial con bloqueo.** El bloque de instalación es una única sentencia/transacción: `LOCK TABLE pedido, pedido_detalle, producto IN SHARE ROW EXCLUSIVE MODE` → crear disparadores → `TRUNCATE` + `INSERT ... SELECT ... GROUP BY` de todo el histórico. Ninguna venta puede quedar fuera de la carga ni de los disparadores.
+
+## d) Consulta desnormalizada y medición final
+
+```sql
+SELECT c.nombre AS categoria, v.total_vendido
+FROM   ventas_diarias_categoria v
+JOIN   categoria c ON c.id = v.categoria_id      -- sólo para mostrar el nombre (≤ 10 filas)
+WHERE  v.fecha = fn_dia_negocio(now())
+ORDER  BY v.total_vendido DESC, c.nombre
+LIMIT  5;
+```
+
+Se publica también como vista `v_top5_categorias_dia` (un `SELECT` simple: el planificador la expande y el plan es el mismo). `test_reporte_top5.sql` verifica que devuelve las mismas 5 filas, en el mismo orden y con los mismos montos que la consulta normalizada (`EXCEPT` en ambos sentidos = 0, comparando además la posición con `row_number()`), y repite la comparación después de hacer entrar a la categoría del 6.º puesto al top 5 con una venta adicional (revertida).
+
+| | Antes (normalizada) | Después (desnormalizada) |
+|---|---|---|
+| Execution Time (3 ejecuciones) | 141,857 / 138,899 / 142,337 ms | 0,104 / 0,100 / 0,101 ms |
+| **Mediana** | **141,857 ms** | **0,101 ms** (≈ 1 400 veces menos) |
+| Buffers por ejecución | ≈ 10 600–11 100 (hit + read) | 13 (hit) |
+| Nodo dominante | `Parallel Seq Scan` de `pedido_detalle` (771 201 filas, 3 procesos) + `Hash Join` con `Seq Scan` de `producto` | `Bitmap Index Scan` por `pk_ventas_diarias_categoria` (10 filas) |
+| Filas procesadas hasta el agregado | ≈ 137 000 (3 × 45 667) → 10 grupos | 10 |
+
+**Lectura de los planes.** Antes, el trabajo crece con el número de líneas vendidas en el día: se lee entera `pedido_detalle`, se une con 50 000 pedidos del día y 50 005 productos y recién entonces se agrupa en 10 categorías (sólo para quedarse con 5). Después, el filtro `fecha = hoy` usa el prefijo de la PK `(fecha, categoria_id)` y devuelve directamente las 10 filas ya agregadas; el `Hash Join` con `categoria` y el `Sort` operan sobre 10 filas, de modo que el costo ya no depende del volumen de ventas. Los planes completos están en `TP4/evidencias/explain_antes.txt` y `explain_despues.txt`. El precio de esta mejora se paga en escritura: cada alta, cambio o baja de un detalle ejecuta además un upsert sobre la fila `(día, categoría)`.

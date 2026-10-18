@@ -349,6 +349,28 @@ BEGIN
 END $$;
 
 -- =============================================================================
+-- SECCION 5: CONSULTA DESNORMALIZADA (REPORTE) Y VISTA
+-- Lee ventas_diarias_categoria (<= 10 filas por dia) y une con categoria solo para el nombre.
+-- Medicion: EXPLAIN (ANALYZE, BUFFERS) 3 veces (ver TP4/evidencias/explain_despues.txt).
+-- =============================================================================
+SELECT c.nombre AS categoria, v.total_vendido
+FROM   ventas_diarias_categoria v
+JOIN   categoria c ON c.id = v.categoria_id
+WHERE  v.fecha = fn_dia_negocio(now())
+ORDER  BY v.total_vendido DESC, c.nombre
+LIMIT  5;
+
+-- La misma consulta como vista, para que los tests la comparen con la normalizada. Es un SELECT
+-- simple: el planificador la expande y el plan es el mismo que el de la consulta suelta.
+CREATE OR REPLACE VIEW v_top5_categorias_dia AS
+SELECT c.nombre AS categoria, v.total_vendido
+FROM   ventas_diarias_categoria v
+JOIN   categoria c ON c.id = v.categoria_id
+WHERE  v.fecha = fn_dia_negocio(now())
+ORDER  BY v.total_vendido DESC, c.nombre
+LIMIT  5;
+
+-- =============================================================================
 -- SECCION 7: REVERSION (comentada) - retira la desnormalizacion sin tocar la fuente
 -- Ejecutar dentro de una transaccion si se desea (BEGIN; ...; COMMIT;). No elimina la columna
 -- `eliminado` ni fn_dia_negocio (no forman parte de la desnormalizacion). pedido, pedido_detalle,

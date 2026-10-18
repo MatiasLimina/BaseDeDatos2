@@ -79,11 +79,11 @@
 
 ## 9. Parte 2 – Consulta desnormalizada y medición final (5.2 d)
 
-- [ ] 9.1 RED: escribir `TP4/tests/test_reporte_top5.sql` (existe `v_top5_categorias_dia`; sus filas y su orden, vía `row_number()`, coinciden con la consulta normalizada embebida en el test; `EXCEPT` en ambos sentidos = 0). Ejecutar → falla por vista inexistente.
-- [ ] 9.2 GREEN: sección 5 del script: consulta suelta del reporte sobre `ventas_diarias_categoria` (unida a `categoria` sólo para el nombre, filtro `fecha = fn_dia_negocio(now())`) y vista `v_top5_categorias_dia`. Ejecutar + test → pasa.
-- [ ] 9.3 TRIANGULATE: agregar al test un caso dentro de `SAVEPOINT`: insertar un detalle grande para la categoría en 6.º puesto para que entre al top 5; ambas consultas vuelven a coincidir. Ejecutar → pasa.
-- [ ] 9.4 Ejecutar `EXPLAIN (ANALYZE, BUFFERS)` 3 veces sobre la consulta suelta y guardar en `TP4/evidencias/explain_despues.txt`; verificar que la mediana es menor que la de 7.2.
-- [ ] 9.5 Documentar en `informe_tp4.md` el punto d): consulta, tabla de dos columnas antes/después (tiempo y nodo dominante) y lectura de los planes.
+- [x] 9.1 RED: escribir `TP4/tests/test_reporte_top5.sql` (existe `v_top5_categorias_dia`; sus filas y su orden, vía `row_number()`, coinciden con la consulta normalizada embebida en el test; `EXCEPT` en ambos sentidos = 0). Ejecutar → falla por vista inexistente.
+- [x] 9.2 GREEN: sección 5 del script: consulta suelta del reporte sobre `ventas_diarias_categoria` (unida a `categoria` sólo para el nombre, filtro `fecha = fn_dia_negocio(now())`) y vista `v_top5_categorias_dia`. Ejecutar + test → pasa.
+- [x] 9.3 TRIANGULATE: agregar al test un caso dentro de `SAVEPOINT`: insertar un detalle grande para la categoría en 6.º puesto para que entre al top 5; ambas consultas vuelven a coincidir. Ejecutar → pasa.
+- [x] 9.4 Ejecutar `EXPLAIN (ANALYZE, BUFFERS)` 3 veces sobre la consulta suelta y guardar en `TP4/evidencias/explain_despues.txt`; verificar que la mediana es menor que la de 7.2.
+- [x] 9.5 Documentar en `informe_tp4.md` el punto d): consulta, tabla de dos columnas antes/después (tiempo y nodo dominante) y lectura de los planes.
 - Commit sugerido: `feat(tp4): consulta top 5 desde estructura desnormalizada y medición final`
 
 ## 10. Parte 2 – Auditoría (5.2 e)
