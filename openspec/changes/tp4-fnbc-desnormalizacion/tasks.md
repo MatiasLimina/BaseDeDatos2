@@ -99,13 +99,13 @@
 - [x] 11.1 Ejecutar `tp_fnbc_control_lote.sql` y `tp_desnormalizacion_top_categorias.sql` de punta a punta (dos veces cada uno) sobre `tp4_foodstore` sin errores, y luego todos los `TP4/tests/*.sql` → todos pasan; registrar la tabla de resultados. **Nota:** los 14 tests pasan (tabla en el informe, sección "Verificación integral"); los scripts se verificaron sentencia a sentencia vía MCP (una sentencia por llamada); la ejecución con `psql -f` y la re-ejecución quedan como pruebas manuales 1 y 2 (el agente no tiene la contraseña de `psql`).
 - [x] 11.2 Completar `informe_tp4.md`: encabezado (materia, integrantes según `TP3/README.md`, link al repo, fecha de medición), protocolo de trabajo sobre `tp4_foodstore`, tabla de adaptaciones consigna vs schema real, conclusiones; verificar con un checklist que cubre Parte 1 a)–f) y Parte 2 a)–e) y que cada afirmación referencia su artefacto. **Nota:** autor indicado por el usuario (Matías Limina); incluye índice, tabla de cobertura, conclusiones y limitaciones.
 - [x] 11.3 Generar el PDF del informe si es viable (revisar `TP3/gen_pdf.py` y sus dependencias); verificar que el PDF abre y contiene las tablas. Si no es viable, dejar constancia y entregar el `.md`. **Nota:** viable; `TP4/gen_pdf.py` (fpdf2 + markdown-it-py, fuentes Segoe UI/Consolas del sistema) genera `TP4/informe_tp4.pdf` (8 páginas); texto y tablas verificados por extracción; sin inspección visual.
-- [ ] 11.4 CHECKPOINT (orquestador): consulta al `advisor` (FINAL_DIFF) sobre `git diff` antes de declarar cerrado el apply.
+- [x] 11.4 CHECKPOINT (orquestador): consulta al `advisor` (FINAL_DIFF) sobre `git diff` antes de declarar cerrado el apply. (Advisor FINAL_DIFF ejecutado en dos pasadas por parte y una sobre la integración; hallazgos resueltos o documentados.)
 - Commit sugerido: `docs(tp4): informe del TP4 con evidencias de FNBC y desnormalización`
 
 ## 12. Pruebas manuales
 
 - [x] 12.1 Crear `TP4/pruebas_manuales.md` con pruebas numeradas; cada una con objetivo, SQL/comando exacto, resultado esperado y casilla `[ ]`. Cubrir como mínimo: instancia original, rechazo de PK/FK, descomposición, `EXCEPT` en ambos sentidos, DF no preservada, `eliminado` por defecto, día de negocio con `TimeZone = 'UTC'`, alta/modificación/baja lógica/borrado de detalle, baja lógica y cambio de fecha de pedido, recategorización de producto, top 5 desnormalizado = normalizado, `EXPLAIN` antes/después, auditoría vacía y auditoría detectando una alteración manual, reversión. Verificar que cada prueba se ejecutó una vez y su resultado coincide con el esperado.
-- [ ] 12.2 STOP: presentar `pruebas_manuales.md` al usuario y esperar su confirmación explícita de que las ejecutó y pasaron. No continuar con el grupo 13 sin esa confirmación.
+- [x] 12.2 STOP: presentar `pruebas_manuales.md` al usuario y esperar su confirmación explícita de que las ejecutó y pasaron. No continuar con el grupo 13 sin esa confirmación. (Confirmado por el usuario: pruebas 1 a 26 y 28 aprobadas, 27 solo variante 1.)
 - Commit sugerido: `docs(tp4): guía de pruebas manuales`
 
 ## 13. Integración al Proyecto Integrador (sólo tras confirmación del usuario)
@@ -116,5 +116,5 @@
 
 ## 14. Cierre
 
-- [ ] 14.1 Ejecutar `openspec validate tp4-fnbc-desnormalizacion --strict` y verificar que no hay errores; luego el orquestador puede lanzar `/opsx:archive`.
+- [x] 14.1 Ejecutar `openspec validate tp4-fnbc-desnormalizacion --strict` y verificar que no hay errores; luego el orquestador puede lanzar `/opsx:archive`. (change válido con --strict.)
 - [ ] 14.2 Recordar explícitamente al usuario, como último mensaje, que restaure la configuración del MCP `postgres` en `C:\Users\matia\.claude.json`: `PG_ALLOW_WRITE=false` y `DATABASE_URL` apuntando nuevamente a `food_store_copia`. Verificar que el aviso quedó en la respuesta final.
