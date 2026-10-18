@@ -39,4 +39,9 @@ BEGIN
     -- las 10 categorias existen y todas tienen productos
     SELECT count(*) INTO v_n FROM categoria c WHERE EXISTS (SELECT 1 FROM producto pr WHERE pr.categoria_id = c.id);
     ASSERT v_n >= 8, 'categorias con productos: ' || v_n;
+
+    -- 7) Sin categorias duplicadas por codificacion: si el cliente (p. ej. psql en la consola de Windows)
+    --    no envia UTF-8, 'Panaderia' con tilde se guarda como 'PanaderÃ­a' y ON CONFLICT no la reconoce.
+    SELECT count(*) INTO v_n FROM categoria WHERE nombre ~ '[ÃÂ]';
+    ASSERT v_n = 0, 'categorias con caracteres mal codificados (mojibake): ' || v_n;
 END $$;

@@ -16,6 +16,12 @@
 -- Adaptaciones al schema real respecto de la consigna: ver TP4/informe_tp4.md (Parte 2).
 -- =============================================================================
 
+-- Este archivo esta en UTF-8 (los nombres de categoria llevan tildes). Se fuerza la codificacion del
+-- cliente porque psql en la consola de Windows usa la del sistema (WIN1252/CP850) y, sin esto,
+-- 'Panaderia' con tilde se guardaria como 'PanaderÃ­a': el ON CONFLICT (nombre) no la reconoce y la
+-- seccion 2 insertaria categorias duplicadas en cada re-ejecucion.
+SET client_encoding = 'UTF8';
+
 -- =============================================================================
 -- SECCION 1: BAJA LOGICA Y DIA DE NEGOCIO
 -- =============================================================================
