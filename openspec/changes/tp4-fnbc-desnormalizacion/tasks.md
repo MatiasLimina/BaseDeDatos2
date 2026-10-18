@@ -28,10 +28,10 @@
 
 ## 4. Parte 1 – Descomposición en FNBC
 
-- [ ] 4.1 RED: escribir `TP4/tests/test_fnbc_descomposicion.sql` (existen `responsable_deposito` con PK `responsable_control_id` y `control_lote` con PK `(lote_id, responsable_control_id)`; FKs con `confdeltype = 'r'` en `pg_constraint`; asignar 801 al depósito 31 es rechazado por PK; `control_lote` con responsable fuera de `responsable_deposito` es rechazado por FK). Ejecutar y verificar que falla por objeto inexistente.
-- [ ] 4.2 GREEN: sección 2 del script con `responsable_deposito` y `control_lote` (FK de `control_lote` hacia `responsable_deposito`, mismo nombre de columna `responsable_control_id`). Ejecutar script + test → pasa.
-- [ ] 4.3 TRIANGULATE: agregar al test que borrar un `deposito` referenciado por `responsable_deposito` es rechazado (`RESTRICT`) y que borrar un `lote` con controles también; ejecutar → pasa.
-- [ ] 4.4 Documentar en `informe_tp4.md` el punto e): algoritmo aplicado sobre `R → D`, esquemas resultantes, por qué cada uno está en FNBC (único determinante = clave) y extracto del script. Verificar que el extracto coincide con el script.
+- [x] 4.1 RED: escribir `TP4/tests/test_fnbc_descomposicion.sql` (existen `responsable_deposito` con PK `responsable_control_id` y `control_lote` con PK `(lote_id, responsable_control_id)`; FKs con `confdeltype = 'r'` en `pg_constraint`; asignar 801 al depósito 31 es rechazado por PK; `control_lote` con responsable fuera de `responsable_deposito` es rechazado por FK). Ejecutar y verificar que falla por objeto inexistente.
+- [x] 4.2 GREEN: sección 2 del script con `responsable_deposito` y `control_lote` (FK de `control_lote` hacia `responsable_deposito`, mismo nombre de columna `responsable_control_id`). Ejecutar script + test → pasa.
+- [x] 4.3 TRIANGULATE: agregar al test que borrar un `deposito` referenciado por `responsable_deposito` es rechazado (`RESTRICT`) y que borrar un `lote` con controles también; ejecutar → pasa.
+- [x] 4.4 Documentar en `informe_tp4.md` el punto e): algoritmo aplicado sobre `R → D`, esquemas resultantes, por qué cada uno está en FNBC (único determinante = clave) y extracto del script. Verificar que el extracto coincide con el script.
 - Commit sugerido: `feat(tp4): descomposición FNBC de control_lote_almacen` (puede precederlo `test(tp4): ...` si se separa RED)
 
 ## 5. Parte 1 – Vista de compatibilidad y migración verificada

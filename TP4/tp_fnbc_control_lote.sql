@@ -98,3 +98,38 @@ SELECT responsable_control_id
 FROM   control_lote_almacen
 GROUP  BY responsable_control_id
 HAVING count(DISTINCT deposito_id) > 1;
+
+-- =============================================================================
+-- SECCION 2: DESCOMPOSICION EN FNBC
+-- Algoritmo de clase sobre la DF violatoria  R -> D  (R = ResponsableControlID, D = DepositoID):
+--   R1 = X u Y   = {R, D}       -> responsable_deposito   (clave: R)
+--   R2 = R - Y   = {L, R}       -> control_lote           (clave: {L, R})
+-- Ambas relaciones estan en FNBC: el unico determinante no trivial de R1 es R (su clave);
+-- R2 no tiene DFs no triviales distintas de las de su clave.
+-- La descomposicion es SIN PERDIDA: el atributo comun R es clave de R1.
+-- =============================================================================
+
+-- R1: cada responsable pertenece a UN unico deposito (PK = responsable). Es la DF R -> D
+-- convertida en restriccion de clave.
+CREATE TABLE responsable_deposito (
+    responsable_control_id BIGINT NOT NULL,   -- participacion total: define la fila
+    deposito_id            BIGINT NOT NULL,   -- participacion total: todo responsable tiene deposito
+    CONSTRAINT pk_responsable_deposito PRIMARY KEY (responsable_control_id),
+    -- RESTRICT: no se puede borrar un usuario/deposito que ya tiene asignaciones.
+    CONSTRAINT fk_rd_responsable FOREIGN KEY (responsable_control_id) REFERENCES usuario (id)  ON DELETE RESTRICT,
+    CONSTRAINT fk_rd_deposito    FOREIGN KEY (deposito_id)            REFERENCES deposito (id) ON DELETE RESTRICT
+);
+
+-- R2: que responsable controla cada lote. La FK apunta a responsable_deposito (no a usuario):
+-- asi todo responsable usado en un control tiene deposito asignado y la reunion natural
+-- no pierde filas. El mismo nombre de columna permite el NATURAL JOIN de la seccion 3.
+CREATE TABLE control_lote (
+    lote_id                BIGINT NOT NULL,
+    responsable_control_id BIGINT NOT NULL,
+    CONSTRAINT pk_control_lote PRIMARY KEY (lote_id, responsable_control_id),
+    CONSTRAINT fk_cl_lote        FOREIGN KEY (lote_id)                REFERENCES lote (id)                                    ON DELETE RESTRICT,
+    CONSTRAINT fk_cl_responsable FOREIGN KEY (responsable_control_id) REFERENCES responsable_deposito (responsable_control_id) ON DELETE RESTRICT
+);
+
+COMMENT ON TABLE responsable_deposito IS 'FNBC: R -> D. Cada responsable de control pertenece a un unico deposito.';
+COMMENT ON TABLE control_lote         IS 'FNBC: que responsable controla cada lote. El deposito se obtiene via responsable_deposito.';
