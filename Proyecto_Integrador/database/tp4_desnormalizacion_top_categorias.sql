@@ -53,6 +53,14 @@ ALTER TABLE pedido_detalle ADD COLUMN IF NOT EXISTS eliminado BOOLEAN NOT NULL D
 --    (fn_vdc_trg_producto) para hallar las líneas de un producto al recategorizarlo; sin él cada
 --    UPDATE de producto.categoria_id recorrería todo pedido_detalle. La PK (pedido_id,
 --    producto_id) no sirve: su primera columna es pedido_id.
+-- Limitaciones conocidas del bloque (documentadas, la lógica no se cambió):
+--  * No filtra por método de acceso (btree): un índice BRIN o hash sobre esa columna haría que
+--    se saltee la creación aunque no sirva para el rango/orden.
+--  * Si ya existe un índice PARCIAL o INVÁLIDO llamado idx_pedido_fecha (o idx_detalle_producto_id),
+--    la condición no lo cuenta y el CREATE INDEX falla por nombre duplicado.
+--  * No usa CREATE INDEX CONCURRENTLY (no puede ir dentro de un bloque DO): en una base grande
+--    bloquea las escrituras de la tabla mientras construye el índice.
+--  * La rama CREATE INDEX no se probó (en tp4_foodstore los índices ya existían).
 DO $$
 BEGIN
     IF NOT EXISTS (
