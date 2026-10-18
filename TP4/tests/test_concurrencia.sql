@@ -13,7 +13,9 @@ BEGIN
     -- 1) fn_vdc_linea toma bloqueos FOR SHARE sobre las filas de pedido y producto que lee,
     --    para que un UPDATE concurrente de pedido.eliminado/fecha o producto.categoria_id (FOR NO KEY UPDATE)
     --    espere hasta el commit de la transaccion que modifica el detalle.
-    v_def := pg_get_functiondef('fn_vdc_linea(bigint,bigint,numeric,integer)'::regprocedure);
+    -- Se quitan los comentarios "--" del cuerpo: explican justamente que NO se filtra por eliminado en
+    -- el WHERE y, sin quitarlos, el regex de 1b los toma por codigo (falso positivo).
+    v_def := regexp_replace(pg_get_functiondef('fn_vdc_linea(bigint,bigint,numeric,integer)'::regprocedure), '--[^\n]*', '', 'g');
     ASSERT v_def ~* 'FOR SHARE OF p, pr', 'fn_vdc_linea no declara FOR SHARE OF p, pr';
 
     -- 1b) El SELECT con FOR SHARE NO filtra por pedido.eliminado: si lo filtrara, un pedido eliminado no
