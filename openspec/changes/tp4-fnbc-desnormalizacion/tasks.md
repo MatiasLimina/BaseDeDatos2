@@ -40,7 +40,7 @@
 - [x] 5.2 GREEN: sección 3 del script: verificación previa de la DF, migración `INSERT ... SELECT DISTINCT` a `responsable_deposito` e `INSERT ... SELECT` a `control_lote`, vista con `NATURAL JOIN`, y consultas `EXCEPT` en ambos sentidos al final. Ejecutar script + test → pasa.
 - [x] 5.3 TRIANGULATE: agregar al test (y como bloque comentado/`ROLLBACK` en el script) la demostración de la DF no preservada: alta del responsable 803 en depósito 30 y control `(501, 803)` → aceptado y la vista muestra dos responsables para `(501,30)`. Ejecutar → pasa.
 - [x] 5.4 Documentar en `informe_tp4.md` el punto f): unión sin pérdida por superclave del atributo común (`R` es clave de `responsable_deposito`), evidencia `EXCEPT` = 0 filas, y el costo de no preservar `{L,D} → R` con las mitigaciones posibles.
-- [ ] 5.5 CHECKPOINT: exponer al usuario la pregunta abierta de `design.md` (¿imponer `{L,D} → R` con disparador?). Si responde que sí, agregar RED/GREEN de ese disparador antes del commit; si no, seguir.
+- [x] 5.5 CHECKPOINT: exponer al usuario la pregunta abierta de `design.md` (¿imponer `{L,D} → R` con disparador?). Si responde que sí, agregar RED/GREEN de ese disparador antes del commit; si no, seguir. **Resuelto: el usuario decidió SOLO documentar y demostrar la DF perdida (sin disparador).**
 - [x] 5.6 Verificación de la Parte 1: ejecutar `tp_fnbc_control_lote.sql` completo dos veces y luego los tres `test_fnbc_*.sql` → todos pasan.
 - Commit sugerido: `feat(tp4): vista de compatibilidad y migración verificada de control_lote`
 

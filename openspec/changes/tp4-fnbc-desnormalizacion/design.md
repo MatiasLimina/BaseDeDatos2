@@ -42,7 +42,7 @@ Algoritmo de clase sobre la DF violatoria `ResponsableControlID → DepositoID`:
 - Migración: `INSERT ... SELECT DISTINCT responsable_control_id, deposito_id` → R1; `INSERT ... SELECT lote_id, responsable_control_id` → R2. La distinción es segura porque la DF garantiza un único depósito por responsable (se verifica antes con un `GROUP BY ... HAVING count(DISTINCT deposito_id) > 1` que debe dar 0 filas).
 
 ### 3. Dependencia no preservada
-`{Lote, Depósito} → Responsable` no puede imponerse con PK/UNIQUE locales tras la descomposición. Se documenta y se demuestra en una transacción con `ROLLBACK` (alta del responsable 803 en depósito 30 y control `(501, 803)` → la vista muestra dos responsables para `(501, 30)`). Mitigaciones posibles descriptas en el informe: disparador de verificación sobre `control_lote`/`responsable_deposito`, o mantener `deposito_id` redundante con FK compuesta y `UNIQUE(lote_id, deposito_id)` (reintroduce redundancia controlada). Por defecto no se implementan (ver Preguntas abiertas).
+`{Lote, Depósito} → Responsable` no puede imponerse con PK/UNIQUE locales tras la descomposición. Se documenta y se demuestra en una transacción con `ROLLBACK` (alta del responsable 803 en depósito 30 y control `(501, 803)` → la vista muestra dos responsables para `(501, 30)`). Mitigaciones posibles descriptas en el informe: disparador de verificación sobre `control_lote`/`responsable_deposito`, o mantener `deposito_id` redundante con FK compuesta y `UNIQUE(lote_id, deposito_id)` (reintroduce redundancia controlada). **Decisión del usuario (resuelta):** no se implementa ninguna; la pérdida sólo se documenta y demuestra.
 
 ### 4. Baja lógica `eliminado`
 `ALTER TABLE pedido ADD COLUMN IF NOT EXISTS eliminado BOOLEAN NOT NULL DEFAULT FALSE` (ídem `pedido_detalle`). En PG ≥ 11 es un cambio de catálogo sin reescritura. Se mantiene el nombre de la consigna (alternativa descartada: reutilizar la convención `activo`, que invertiría el sentido de la consigna). Se documenta como adaptación al schema real.
@@ -94,7 +94,7 @@ Sección marcada "solo en copia" del script de la Parte 2, ejecutada **antes** d
 El reporte desnormalizado se publica como consulta suelta en el script (la que se mide con `EXPLAIN`) y como vista `v_top5_categorias_dia` para que los tests puedan compararla contra la consulta normalizada (incluido el orden, vía `row_number()`). La vista es un `SELECT` simple, por lo que el planificador la expande y el plan medido es el mismo.
 
 ### 12. Estrategia de tests (Strict TDD)
-- Archivos `TP4/tests/test_*.sql`, autocontenidos, con bloques `DO $$ ... ASSERT ...; $$` (`plpgsql.check_asserts` activo por defecto). Los que modifican datos van entre `BEGIN; ... ROLLBACK;`.
+- Archivos `TP4/tests/test_*.sql`, autocontenidos, con bloques `DO $$ ... ASSERT ...; $$` (`plpgsql.check_asserts` activo por defecto). Los que modifican datos se revierten dentro del propio bloque `DO` con una excepción centinela (`RAISE EXCEPTION ... USING ERRCODE = 'T4RB1'` capturada por un subbloque `EXCEPTION WHEN SQLSTATE 'T4RB1'`), no con `BEGIN; ... ROLLBACK;`: el MCP `postgres` admite una sola sentencia por llamada y no permite control de transacción. Los ids de apoyo de los tests son altos (p. ej. 900803) para no colisionar con datos reales.
 - RED válido = el test falla por la razón esperada (objeto inexistente o aserción falsa), capturado en la evidencia de la tarea. GREEN = el script de producción correspondiente se ejecuta y el test pasa sin errores.
 - Archivos previstos: `test_fnbc_esquema_original.sql`, `test_fnbc_descomposicion.sql`, `test_fnbc_vista_migracion.sql`, `test_baja_logica.sql`, `test_dia_negocio.sql`, `test_datos_prueba.sql`, `test_ventas_diarias_estructura.sql`, `test_trigger_detalle.sql`, `test_trigger_pedido_producto.sql`, `test_reporte_top5.sql`, `test_auditoria.sql`, `test_reversibilidad.sql`.
 
@@ -123,5 +123,5 @@ Commits atómicos Conventional Commits en español con scope `tp4`, uno por grup
 
 ## Open Questions
 
-- ¿Se desea imponer además la DF `{Lote, Depósito} → Responsable` con un disparador de verificación (fuera de lo que pide la consigna)? Por defecto sólo se documenta y demuestra; agregarlo sería una tarea extra en el grupo 3 sin cambiar el resto del plan.
+- ~~¿Se desea imponer además la DF `{Lote, Depósito} → Responsable` con un disparador de verificación?~~ **Resuelta:** el usuario decidió que la DF perdida sólo se documenta y demuestra (en transacción revertida), sin disparador. Ver Decisión 3.
 - Al integrar: ¿la columna `eliminado` se incorpora también a `Proyecto_Integrador/database/schema.sql` o sólo como script aparte? Se decide en la etapa de integración (tarea con confirmación).
