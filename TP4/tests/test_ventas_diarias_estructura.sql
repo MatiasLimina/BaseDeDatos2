@@ -4,6 +4,7 @@
 DO $$
 DECLARE
     v_n    BIGINT;
+    v_n2   BIGINT;
     v_cols TEXT;
     v_hoy  DATE := fn_dia_negocio(now());
 BEGIN
@@ -60,8 +61,14 @@ BEGIN
     WHERE  f.total IS DISTINCT FROM v.total_vendido OR f.lineas IS DISTINCT FROM v.cantidad_lineas;
     ASSERT v_n = 0, 'diferencias entre fuente y tabla tras la carga inicial: ' || v_n;
 
+    -- Las filas de hoy deben coincidir con las categorias con ventas vigentes hoy en la fuente (>= 1: si no hay
+    -- datos del dia, ejecute la seccion 2 del script hoy y re-cree la estructura de la seccion 4).
+    SELECT count(DISTINCT pr.categoria_id) INTO v_n2
+    FROM   pedido_detalle d JOIN pedido p ON p.id = d.pedido_id JOIN producto pr ON pr.id = d.producto_id
+    WHERE  NOT p.eliminado AND NOT d.eliminado AND fn_dia_negocio(p.fecha) = v_hoy;
+    ASSERT v_n2 > 0, 'PRECONDICION: no hay ventas del dia de negocio actual; ejecute la seccion 2 del script hoy y re-cree la estructura (seccion 4)';
     SELECT count(*) INTO v_n FROM ventas_diarias_categoria WHERE fecha = v_hoy;
-    ASSERT v_n = 10, 'filas de hoy: ' || v_n || ' (se esperaban 10 categorias)';
+    ASSERT v_n = v_n2, 'filas de hoy: ' || v_n || ' (la fuente tiene ' || v_n2 || ' categorias con ventas)';
     -- la tabla no guarda filas vacias
     SELECT count(*) INTO v_n FROM ventas_diarias_categoria WHERE cantidad_lineas = 0;
     ASSERT v_n = 0, 'hay filas con 0 lineas: ' || v_n;

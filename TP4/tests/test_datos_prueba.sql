@@ -6,6 +6,11 @@ DECLARE
     v_ini  TIMESTAMPTZ := (fn_dia_negocio(now())::timestamp) AT TIME ZONE 'America/Argentina/Buenos_Aires';
     v_n    BIGINT;
 BEGIN
+    -- Precondicion: debe haber datos del dia de negocio actual (los genera la seccion 2 del script el
+    -- mismo dia). Si se ejecuta otro dia sin re-ejecutar la seccion 2, falla con este mensaje.
+    SELECT count(*) INTO v_n FROM pedido p WHERE p.fecha >= v_ini AND p.fecha < v_ini + INTERVAL '1 day';
+    ASSERT v_n > 0, 'PRECONDICION: no hay pedidos del dia de negocio actual; ejecute la seccion 2 de tp_desnormalizacion_top_categorias.sql hoy (y re-cree la estructura de la seccion 4)';
+
     -- >= 8 categorias con ventas vigentes en el dia de negocio actual
     SELECT count(DISTINCT pr.categoria_id) INTO v_n
     FROM   pedido_detalle d

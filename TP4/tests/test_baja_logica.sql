@@ -1,7 +1,9 @@
 -- Test (Parte 2, grupo 6): baja logica `eliminado` en pedido y pedido_detalle.
 -- Ejecutar: psql -v ON_ERROR_STOP=1 -d tp4_foodstore -f TP4/tests/test_baja_logica.sql
 -- Requiere TP4/tp_desnormalizacion_top_categorias.sql (seccion 1). Es re-ejecutable tras la carga de
--- datos de prueba: se verifica que el historico previo a hoy quedo intacto (todo FALSE).
+-- datos de prueba y en cualquier dia posterior: el "historico original" se define por la fecha maxima de
+-- la base clonada (2026-09-21, ver design.md), no por la fecha de hoy, porque los datos generados por la
+-- seccion 2 llevan la fecha del dia en que se ejecuto el script y tambien tienen eliminado = TRUE.
 DO $$
 DECLARE
     v_n BIGINT;
@@ -20,10 +22,10 @@ BEGIN
     END LOOP;
 
     -- 2) El historico previo al dia de negocio actual no fue alterado (todo FALSE)
-    SELECT count(*) INTO v_n FROM pedido WHERE eliminado AND fecha < (CURRENT_DATE - 1);
+    SELECT count(*) INTO v_n FROM pedido WHERE eliminado AND fecha < TIMESTAMPTZ '2026-09-22 00:00:00-03';
     ASSERT v_n = 0, 'pedidos historicos con eliminado=TRUE: ' || v_n;
     SELECT count(*) INTO v_n FROM pedido_detalle d JOIN pedido p ON p.id = d.pedido_id
-    WHERE  d.eliminado AND p.fecha < (CURRENT_DATE - 1);
+    WHERE  d.eliminado AND p.fecha < TIMESTAMPTZ '2026-09-22 00:00:00-03';
     ASSERT v_n = 0, 'detalles historicos con eliminado=TRUE: ' || v_n;
 
     -- 3) NULL rechazado por NOT NULL (en ambas tablas), con rollback por excepcion centinela
