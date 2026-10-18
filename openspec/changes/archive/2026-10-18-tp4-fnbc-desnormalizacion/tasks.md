@@ -117,4 +117,4 @@
 ## 14. Cierre
 
 - [x] 14.1 Ejecutar `openspec validate tp4-fnbc-desnormalizacion --strict` y verificar que no hay errores; luego el orquestador puede lanzar `/opsx:archive`. (change válido con --strict.)
-- [ ] 14.2 Recordar explícitamente al usuario, como último mensaje, que restaure la configuración del MCP `postgres` en `C:\Users\matia\.claude.json`: `PG_ALLOW_WRITE=false` y `DATABASE_URL` apuntando nuevamente a `food_store_copia`. Verificar que el aviso quedó en la respuesta final.
+- [x] 14.2 Recordar explícitamente al usuario, como último mensaje, que restaure la configuración del MCP `postgres` en `C:\Users\matia\.claude.json`: `PG_ALLOW_WRITE=false` y `DATABASE_URL` apuntando nuevamente a `food_store_copia`. Verificar que el aviso quedó en la respuesta final.
