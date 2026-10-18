@@ -804,8 +804,8 @@ SELECT * FROM v_auditoria_ventas_diarias;                                     --
 
 - **Criterio de aprobación:** en las variantes 1 y 2 (baja) y 3 y 4 (reactivación) se **observa la espera** (pasos 4/5 de la variante 1, paso 2 de la 2, paso 2 de la 3 y paso 2 de la 4) y la auditoría final y tras la limpieza devuelve `(0 rows)`. Si en la variante 1 la sesión B **no** espera (devuelve `UPDATE 1` al instante), el `FOR SHARE` no está actuando: la prueba falla.
 - **Nota:** esta prueba no pudo ejecutarse de forma automática (requiere dos sesiones). Su resultado esperado sale del mecanismo documentado en el informe (punto c) y en el script (sección 4): `FOR SHARE` conflictúa con `FOR NO KEY UPDATE`, que es el bloqueo del `UPDATE` de `pedido.eliminado`. El test automático `test_concurrencia.sql` solo verifica que el bloqueo está declarado en `fn_vdc_linea` (y que no se filtra por `eliminado` en el `WHERE`). Las variantes 3 y 4 cubren el caso de la reactivación concurrente, que con el bloqueo condicionado a `NOT p.eliminado` perdía la línea.
-- [ ] Aprobada (variante 1)  [ ] Aprobada (variante 2)  [ ] Aprobada (variante 3)  [ ] Aprobada (variante 4)  [ ] Limpieza hecha y auditoría vacía
-- **Estado: no ejecutada por el autor.**
+- [x] Aprobada (variante 1)  [ ] Aprobada (variante 2)  [ ] Aprobada (variante 3)  [ ] Aprobada (variante 4)  [x] Limpieza hecha y auditoría vacía
+- **Estado: ejecución parcial.** El autor ejecutó y aprobó la **variante 1** (sesión B esperó hasta el `COMMIT` de A y devolvió `UPDATE 1`; auditoría 0 filas; pedido 250003 restaurado). Las variantes 2, 3 y 4: **no ejecutadas por el autor**.
 
 ### Prueba 28 – Reversión de la desnormalización
 
@@ -860,8 +860,8 @@ SELECT * FROM v_auditoria_ventas_diarias;                                     --
 | D. Top 5 y medición | 17, 18, 19 | [x] 17  [x] 18  [x] 19 |
 | E. Disparadores | 20, 21, 22 | [x] 20  [x] 21  [x] 22 |
 | F. Auditoría | 23, 24, 25 | [x] 23  [x] 24  [x] 25 |
-| G. TRUNCATE, concurrencia, reversión | 26, 27, 28 | [x] 26  [ ] 27  [ ] 28 (27 y 28 no ejecutadas por el autor) |
+| G. TRUNCATE, concurrencia, reversión | 26, 27, 28 | [x] 26  [~] 27 (sólo variante 1)  [ ] 28 (variantes 2 a 4 de la 27 y la 28: no ejecutadas por el autor) |
 
-- [ ] **Todas las pruebas (28) aprobadas.** Estado: **26 de 28 aprobadas** (1 a 26). Las pruebas 27 (concurrencia con dos sesiones) y 28 (reversión) **no fueron ejecutadas por el autor**; la 28 sólo está cubierta por los tests automáticos (`test_reversibilidad`, `test_concurrencia`) y por la ejecución del agente vía MCP, y el `FOR SHARE` de la 27 no se probó en vivo.
+- [ ] **Todas las pruebas (28) aprobadas.** Estado: **26 de 28 pruebas aprobadas completas (1 a 26) más la 27 parcial (sólo la variante 1)**. Las variantes 2, 3 y 4 de la prueba 27 y la prueba 28 (reversión) **no fueron ejecutadas por el autor**; `FOR SHARE` se probó en vivo para baja lógica vs alta de detalle, pero no para la reactivación, y la 28 sólo está cubierta por los tests automáticos (`test_reversibilidad`, `test_concurrencia`) y por la ejecución del agente vía MCP.
 - Ejecutado por: Matías Limina   Fecha: 2026-10-18   Equipo / PostgreSQL: equipo del autor / PostgreSQL 18.6
 - Observaciones (pruebas que fallaron y por qué): ninguna falló en la versión final. Durante las corridas se detectaron y corrigieron dos defectos reales: falso positivo de `test_concurrencia` por comentarios (`46d3da5`) y categorías duplicadas por la codificación de `psql` en Windows (`7417b2d`).
