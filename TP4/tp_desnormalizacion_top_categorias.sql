@@ -230,14 +230,19 @@ CREATE OR REPLACE FUNCTION fn_vdc_linea(
 LANGUAGE plpgsql
 AS $$
 DECLARE
+    v_elim  BOOLEAN;
     v_fecha DATE;
     v_cat   BIGINT;
 BEGIN
-    SELECT fn_dia_negocio(p.fecha), pr.categoria_id INTO v_fecha, v_cat
+    -- Se bloquea SIEMPRE (sin filtrar por p.eliminado en el WHERE) y se decide DESPUES de leer:
+    -- si el filtro estuviera en el WHERE, un pedido eliminado no tomaria ningun bloqueo y una
+    -- reactivacion concurrente (UPDATE pedido SET eliminado = FALSE) podria perder la linea.
+    -- Ver "CONCURRENCIA" mas abajo.
+    SELECT p.eliminado, fn_dia_negocio(p.fecha), pr.categoria_id INTO v_elim, v_fecha, v_cat
     FROM   pedido p, producto pr
-    WHERE  p.id = p_pedido_id AND pr.id = p_producto_id AND NOT p.eliminado
-    FOR SHARE OF p, pr;                 -- ver "CONCURRENCIA" mas abajo: cierra la carrera detalle vs pedido/producto
-    IF FOUND THEN                       -- un pedido eliminado no aporta lineas
+    WHERE  p.id = p_pedido_id AND pr.id = p_producto_id
+    FOR SHARE OF p, pr;
+    IF FOUND AND NOT v_elim THEN        -- un pedido eliminado no aporta lineas
         PERFORM fn_vdc_aplicar(v_fecha, v_cat, p_signo * p_subtotal, p_signo);
     END IF;
 END $$;
@@ -319,7 +324,9 @@ END $$;
 -- desincronizada sin aviso: se bloquea con un disparador BEFORE TRUNCATE que aborta la sentencia
 -- (decision: es barato y evita el error silencioso; para vaciar las fuentes use DELETE, que si
 -- sincroniza, o desinstale primero la desnormalizacion con la seccion 7). `producto` no necesita
--- guarda: las FK de pedido_detalle impiden TRUNCATE producto sin CASCADE.
+-- guarda propia: las FK de pedido_detalle impiden TRUNCATE producto sin CASCADE, y con CASCADE
+-- (tambien TRUNCATE categoria CASCADE) la cascada alcanza a pedido_detalle y dispara este mismo
+-- bloqueo, por lo que la sentencia aborta.
 CREATE OR REPLACE FUNCTION fn_vdc_bloquear_truncate() RETURNS TRIGGER
 LANGUAGE plpgsql
 AS $$
@@ -352,7 +359,14 @@ END $$;
 --    commit de T2. Si T1 llega despues, su UPDATE espera a T2 y, al despertar, su disparador
 --    (con snapshot nuevo, READ COMMITTED) ya ve el detalle de T2 y lo resta. Si T1 llego primero,
 --    T2 espera a T1 y al despertar la fila de pedido re-evaluada tiene eliminado = TRUE: no suma.
---    En ambos ordenes el resultado es correcto.
+--    Importante: el bloqueo se toma tambien cuando el pedido YA esta eliminado (la funcion lee
+--    p.eliminado sin filtrarlo en el WHERE y decide despues). Caso espejo, REACTIVACION: T1 hace
+--    UPDATE pedido SET eliminado = FALSE sobre un pedido eliminado y trg_vdc_pedido SUMA los detalles
+--    vigentes que ve; T2 inserta un detalle del mismo pedido. Si T2 no tomara bloqueo (filtro
+--    NOT p.eliminado en el WHERE) leeria eliminado = TRUE, no sumaria y la linea se perderia al
+--    confirmar T1. Con el bloqueo T2 espera a T1, relee eliminado = FALSE y suma; si T2 llego primero,
+--    T1 espera a T2 y su disparador ya ve el detalle de T2 y lo suma. En los escenarios
+--    analizados (baja y reactivacion, en ambos ordenes de llegada) el resultado es correcto.
 --
 -- 4. Costo: (a) contencion: mientras dura la transaccion que inserta/modifica el detalle, las filas
 --    de pedido y producto leidas quedan bloqueadas contra UPDATE; en particular un
@@ -364,7 +378,17 @@ END $$;
 --    detecta el deadlock y aborta una transaccion, que se reintenta. (c) fila caliente: ventas
 --    simultaneas de la misma categoria el mismo dia se serializan en la fila (fecha, categoria) de
 --    ventas_diarias_categoria hasta el commit (mitigacion futura: contadores fragmentados); con
---    categorias tocadas en orden inverso tambien puede haber deadlock.
+--    categorias tocadas en orden inverso tambien puede haber deadlock. (d) ciclos nuevos introducidos
+--    por FOR SHARE: pedido <-> fila de totales y producto <-> fila de totales. Ejemplo: T2 ya vendio
+--    una linea de la categoria C ese dia (tiene la fila (hoy, C) bloqueada) y ahora inserta otro
+--    detalle del pedido 7 (necesita FOR SHARE sobre pedido 7), mientras T1 hizo UPDATE pedido SET
+--    eliminado sobre el pedido 7 (tiene la fila de pedido y quiere actualizar la fila (hoy, C)):
+--    se esperan mutuamente. Analogo con UPDATE producto SET categoria_id (tiene la fila de producto
+--    y quiere las filas de totales) contra una venta de ese producto. PostgreSQL detecta el ciclo y
+--    aborta UNA de las transacciones con el error de deadlock (sin corrupcion: se revierte entera)
+--    y la aplicacion reintenta. Mitigacion ya en uso en el proyecto: el SP real
+--    Proyecto_Integrador/database/procedures.sql (lineas 110-114) toma SELECT ... FOR UPDATE sobre
+--    producto ANTES de insertar el detalle, es decir toma primero el bloqueo fuerte.
 --
 -- 5. Carrera residual (NO cerrada): baja logica / cambio de fecha de un PEDIDO vs recategorizacion
 --    de un PRODUCTO que ese pedido contiene. trg_vdc_pedido y trg_vdc_producto leen sin bloquearse
@@ -385,9 +409,16 @@ END $$;
 --    de abajo (LOCK + TRUNCATE ventas_diarias_categoria + carga inicial), que es idempotente y
 --    deja la tabla igual a la fuente. Mientras corre, las escrituras en las fuentes esperan.
 --
--- 8. Garantia: con el bloqueo FOR SHARE y los disparadores, la tabla queda consistente para las
---    operaciones soportadas en READ COMMITTED; NO es una garantia absoluta (puntos 5 y 6). La
---    auditoria es la red de seguridad.
+-- 8. Garantia: con el bloqueo FOR SHARE (tambien sobre pedidos eliminados) y los disparadores, la
+--    tabla queda consistente en los escenarios de concurrencia analizados (puntos 1 a 3, en
+--    READ COMMITTED); NO es una garantia absoluta: quedan la carrera residual (punto 5), el caso
+--    exotico (punto 6) y cualquier interleaving que este analisis no haya contemplado. La auditoria
+--    (seccion 6) es la red de seguridad.
+--
+-- 9. Privilegios: SELECT ... FOR SHARE exige, ademas de SELECT, privilegio UPDATE (sobre al menos
+--    una columna) en pedido y producto para el rol que dispara el trigger, porque las funciones
+--    NO son SECURITY DEFINER. Al integrar al proyecto hay que verificar los privilegios del rol de
+--    la aplicacion o declarar las funciones fn_vdc_* SECURITY DEFINER con search_path fijo.
 -- -----------------------------------------------------------------------------
 
 -- Instalacion atomica: bloqueo + disparadores + carga inicial en UNA transaccion (un bloque DO es
