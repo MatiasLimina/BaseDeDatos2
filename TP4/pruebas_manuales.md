@@ -814,6 +814,10 @@ SELECT * FROM v_auditoria_ventas_diarias;                                     --
 
   ```sql
   BEGIN;
+  -- Si en esta sesión creaste los ayudantes del prerrequisito 5, la vista temporal t_delta depende de
+  -- ventas_diarias_categoria y PostgreSQL no deja eliminar la tabla (ERROR 2BP01). Se elimina acá; como
+  -- todo termina en ROLLBACK, la vista vuelve a existir para seguir usándola.
+  DROP VIEW IF EXISTS pg_temp.t_delta;
   DROP VIEW IF EXISTS v_top5_categorias_dia;
   DROP VIEW IF EXISTS v_auditoria_ventas_diarias;
   DROP TRIGGER IF EXISTS trg_vdc_pedido_detalle ON pedido_detalle;
