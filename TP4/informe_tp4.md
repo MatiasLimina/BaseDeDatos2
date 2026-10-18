@@ -1,6 +1,28 @@
 # Informe TP4 – FNBC y desnormalización controlada (Food Store)
 
-> Base de trabajo: `tp4_foodstore` (PostgreSQL 18). Notación: **L** = `LoteID`, **D** = `DepositoID`, **R** = `ResponsableControlID`.
+| | |
+|---|---|
+| **Materia** | Base de Datos II |
+| **Trabajo** | TP Unidad 4 – Forma Normal de Boyce-Codd y desnormalización controlada |
+| **Autor** | Matías Limina |
+| **Fecha** | 2026-10-18 (fecha de las mediciones y de la verificación) |
+| **Motor / base** | PostgreSQL 18.6 – base de trabajo `tp4_foodstore` (copia de `food_store_copia`) |
+| **Repositorio** | https://github.com/MatiasLimina/BaseDeDatos2.git (carpeta `TP4/`) |
+
+**Entregables.** `TP4/informe_tp4.md` (este informe), `TP4/tp_fnbc_control_lote.sql` (Parte 1), `TP4/tp_desnormalizacion_top_categorias.sql` (Parte 2), `TP4/tests/` (14 tests automáticos), `TP4/evidencias/` (planes `EXPLAIN` y auditoría) y `TP4/pruebas_manuales.md` (28 pruebas para ejecutar a mano).
+
+**Protocolo de trabajo.** Todo se desarrolló y se midió **solo** sobre `tp4_foodstore`; no se tocaron `food_store` ni `food_store_copia`. Los scripts son idempotentes (`DROP ... IF EXISTS`, `CREATE ... IF NOT EXISTS`, guarda anti-duplicado) y se ejecutan con `psql -v ON_ERROR_STOP=1 -d tp4_foodstore -f <archivo>`. Cada comportamiento se escribió primero como test (`DO $$ ... ASSERT ... $$`, los que modifican datos van dentro de una transacción que se revierte) y recién después como código.
+
+Notación: **L** = `LoteID`, **D** = `DepositoID`, **R** = `ResponsableControlID`.
+
+## Índice
+
+1. **Parte 1 – FNBC de `control_lote_almacen`**: a) dependencias funcionales; b) clausuras y claves candidatas; c) forma normal; d) anomalías; e) descomposición en FNBC; f) vista de compatibilidad, reunión sin pérdida y costo.
+2. **Parte 2 – Desnormalización controlada del top 5 de categorías del día**: adaptaciones al schema real y datos de prueba; a) medición baseline; b) justificación; c) estructura, disparadores y casos borde; d) consulta desnormalizada y medición final; e) auditoría de desincronización.
+3. **Verificación integral**.
+4. **Conclusiones**.
+5. **Limitaciones**.
+
 > Artefactos de la Parte 1: `TP4/tp_fnbc_control_lote.sql` y `TP4/tests/test_fnbc_*.sql`.
 
 # Parte 1 – Forma Normal de Boyce-Codd: `control_lote_almacen`
@@ -245,3 +267,64 @@ WHERE f.total IS DISTINCT FROM v.total_vendido OR f.lineas IS DISTINCT FROM v.ca
 **Criterio de comparación.** Se recalcula desde la fuente de verdad todo el histórico con el mismo criterio de contribución que los disparadores (`eliminado = FALSE` en pedido y detalle, `fn_dia_negocio`, categoría actual) y se compara con `FULL OUTER JOIN` y `IS DISTINCT FROM` sobre **total y cantidad de líneas**. Una fila de salida significa que la clave `(fecha, categoria_id)` tiene un total distinto, **falta** en la tabla redundante (`total_tabla IS NULL`) o **sobra** en ella (`total_fuente IS NULL`). Recorre todo el historico: es una tarea de auditoría programada, no del panel.
 
 **Evidencia.** Tras la carga inicial y después de ejecutar todos los tests de disparadores la auditoría devuelve **0 filas** (`TP4/evidencias/auditoria.txt`, obtenida mediante el MCP `postgres`, no desde una sesión `psql`). `test_auditoria.sql` verifica además que detecta, dentro de transacciones revertidas: un total alterado a mano (devuelve exactamente esa fila, con diferencia 1,00), una cantidad de líneas alterada, una fila borrada, una fila de más y una desincronización real de la fuente con el disparador deshabilitado; `test_trigger_detalle.sql` y `test_trigger_pedido_producto.sql` terminan cada escenario con la aserción "auditoría = 0 filas".
+
+
+
+# Verificación integral
+
+Resultado de la verificación final sobre `tp4_foodstore` (2026-10-18), con el estado de la base: 250 002 pedidos, 771 201 detalles, 10 categorías, 1 756 filas en `ventas_diarias_categoria`, 5 disparadores `trg_vdc_*`, auditoría con 0 filas.
+
+| # | Test (`TP4/tests/`) | Qué verifica | Resultado |
+|---|---------------------|--------------|-----------|
+| 1 | `test_fnbc_esquema_original.sql` | Instancia 501/502/503, PK y FK del esquema original | pasa |
+| 2 | `test_fnbc_descomposicion.sql` | PK y FK `RESTRICT` de la descomposición, rechazos | pasa |
+| 3 | `test_fnbc_restricciones_indices.sql` | CHECK, `NOT NULL` por defecto e índices | pasa |
+| 4 | `test_fnbc_vista_migracion.sql` | `EXCEPT` en ambos sentidos, conteos, DF `{L,D} → R` no preservada | pasa |
+| 5 | `test_baja_logica.sql` | `eliminado BOOLEAN NOT NULL DEFAULT false` | pasa |
+| 6 | `test_dia_negocio.sql` | `fn_dia_negocio` con sesión en UTC y en Buenos Aires, `IMMUTABLE` | pasa |
+| 7 | `test_datos_prueba.sql` | ≥ 8 categorías con ventas hoy, ≥ 100 000 detalles vigentes, eliminados | pasa |
+| 8 | `test_ventas_diarias_estructura.sql` | PK, FK, CHECK; tabla = fuente tras la carga inicial | pasa |
+| 9 | `test_trigger_detalle.sql` | Alta, subtotal, producto, baja/reactivación, borrado, última línea, `ROLLBACK` | pasa |
+| 10 | `test_trigger_pedido_producto.sql` | Baja lógica y fecha de pedido, recategorización de producto | pasa |
+| 11 | `test_reporte_top5.sql` | Top 5 desnormalizado = normalizado (también con una venta que cambia el top) | pasa |
+| 12 | `test_auditoria.sql` | Auditoría vacía y detección de alteraciones | pasa |
+| 13 | `test_reversibilidad.sql` | Reversión sin tocar la fuente | pasa |
+| 14 | `test_concurrencia.sql` | `FOR SHARE` declarado y `TRUNCATE` bloqueado (estructural) | pasa |
+
+**Cómo se ejecutó.** Los 14 tests se ejecutaron contra `tp4_foodstore` a través del MCP `postgres`, que acepta **una sentencia por llamada**: cada bloque `DO` se envió completo y los `CREATE`/`DROP FUNCTION` de ayuda se enviaron por separado. Los dos scripts de entrega se verificaron en la misma modalidad, sentencia a sentencia (ver *Limitaciones*). Después de los tests, la base quedó como antes de empezar (mismos conteos, auditoría con 0 filas, sin funciones de ayuda `t4_*`).
+
+**Cobertura de la consigna.**
+
+| Punto | Dónde se resuelve |
+|-------|-------------------|
+| Parte 1 a)–f) | secciones a) a f) de la Parte 1; `tp_fnbc_control_lote.sql`; tests 1–4 |
+| Parte 2 a) medición baseline | sección a); `evidencias/explain_antes.txt` |
+| Parte 2 b) justificación | sección b) (un solo párrafo) |
+| Parte 2 c) estructura y disparadores | sección c); sección 4 del script; tests 8–10, 13, 14 |
+| Parte 2 d) consulta y medición final | sección d); `evidencias/explain_despues.txt`; test 11 |
+| Parte 2 e) auditoría | sección e); `evidencias/auditoria.txt`; test 12 |
+
+Las 28 pruebas manuales de `TP4/pruebas_manuales.md` repiten estas comprobaciones con SQL listo para pegar y cubren además la ejecución de los scripts con `psql -f` y la prueba de concurrencia con dos sesiones.
+
+
+# Conclusiones
+
+**Parte 1.** `control_lote_almacen(L, D, R)` está en 3FN pero **no** en FNBC: la regla de negocio "un responsable pertenece a un único depósito" (`R → D`) tiene un determinante que no es superclave, y los tres atributos son primos, que es justo el caso en que 3FN es más débil que FNBC. La descomposición `responsable_deposito(R, D)` + `control_lote(L, R)` elimina las tres anomalías (el hecho "801 trabaja en el depósito 30" se guarda una sola vez), es **sin pérdida** (el atributo común `R` es clave de `responsable_deposito`; `EXCEPT` en ambos sentidos = 0 filas) y deja la restricción `R → D` como clave primaria, es decir, impuesta por el motor. El precio es el clásico de FNBC: **no preserva** la dependencia `{L, D} → R`, que antes imponía la PK y ahora puede violarse sin que ninguna restricción local lo detecte (se demuestra con el responsable 900803). Se decidió documentar y demostrar esa pérdida en lugar de imponerla con un disparador, porque la alternativa que la preserva (repetir `D` en `control_lote`) reintroduce la redundancia que se quería eliminar.
+
+**Parte 2.** Para el panel "top 5 de categorías del día" la tabla de totales `ventas_diarias_categoria`, mantenida por disparadores, bajó la consulta de **141,857 ms a 0,101 ms** (mediana de tres ejecuciones, ≈ 1 400 veces menos) y de ≈ 11 000 buffers a 13, porque la lectura pasó de recorrer 771 000 detalles a leer 10 filas por clave primaria; el costo ya no depende del volumen de ventas. Lo que se paga: cada alta, cambio o baja de un detalle ejecuta además un upsert en una fila `(día, categoría)` (escritura más cara y fila caliente), la lógica vive en tres disparadores que hay que mantener, y aparece una posibilidad nueva de error (que el dato derivado se desincronice), que se contiene con tres mecanismos: actualización en la misma transacción, bloqueo `FOR SHARE` de las filas leídas y una auditoría que recalcula desde la fuente. La estructura es **reversible** sin tocar los datos (`DROP` de disparadores, funciones y tabla) y se eligió sobre una vista materializada porque ésta solo es exacta justo después de un `REFRESH`.
+
+**Cuándo conviene.** La desnormalización se justifica cuando la lectura es mucho más frecuente que la escritura y el costo de la consulta crece con el volumen (como aquí: un panel "en tiempo real" consultado muchas veces por minuto). No se justifica si la tabla se consulta pocas veces, si el volumen es chico o si la escritura es el cuello de botella. En este trabajo la decisión se tomó **midiendo** (antes y después con `EXPLAIN (ANALYZE, BUFFERS)`) y dejando una forma barata de verificar la consistencia (la auditoría) y de volver atrás.
+
+
+# Limitaciones
+
+Lo que este trabajo **no** demuestra, o demuestra solo en parte:
+
+- **Cómo se verificaron los scripts.** La verificación automatizada solo pudo enviar **una sentencia por llamada** a la base (MCP `postgres`): se verificó cada sentencia de los dos scripts y se ejecutaron los 14 tests, pero **no se ejecutaron los archivos completos con `psql -f`** (`psql` pide la contraseña y no se le entregó). La ejecución de punta a punta y la re-ejecución (idempotencia) con `psql -v ON_ERROR_STOP=1 -f` quedan como pruebas manuales 1 y 2 de `TP4/pruebas_manuales.md`, y los 28 casos de esa guía los debe confirmar quien entrega el trabajo.
+- **Concurrencia real.** El test automático de concurrencia es estructural (comprueba que el `FOR SHARE` está declarado en `fn_vdc_linea` y que `TRUNCATE` está bloqueado). El comportamiento con **dos sesiones simultáneas** (espera y resultado correcto en ambos órdenes) se razonó a partir de la matriz de bloqueos de PostgreSQL y se describe como prueba manual 27; no se ejecutó automáticamente. Solo se consideró `READ COMMITTED`; no se probó `SERIALIZABLE`.
+- **La garantía de consistencia no es absoluta.** Quedan una **carrera residual** (baja lógica o cambio de fecha de un pedido contra la recategorización simultánea de un producto que lo contiene) y un **caso exótico** (una única sentencia con CTE modificante que cambia `pedido.eliminado` e inserta detalles del mismo pedido). Ambos están documentados con su mitigación, y la auditoría es la red de seguridad; no se resolvieron porque son operaciones administrativas muy infrecuentes.
+- **Mediciones.** Se hicieron en un único equipo, con caché caliente pero no exacta (las ejecuciones "antes" todavía leyeron ≈ 1 500–2 100 buffers de disco), tres ejecuciones y mediana. Los tiempos absolutos dependen del equipo; lo que se sostiene es el orden de magnitud y el cambio de plan. **No se midió el sobrecosto en escritura** de los disparadores (alta masiva de detalles con y sin disparadores) ni el costo de recategorizar un producto con mucho historial; solo se describen.
+- **Datos sintéticos.** Los pedidos del día se generan con `generate_series` (distribución casi uniforme, 3 productos por pedido, 10 categorías); no reflejan una distribución de ventas real, y se generan con la fecha de ejecución, por lo que el top 5 y los importes cambian si se regeneran. Re-ejecutar el script 2 **otro día** agrega otro bloque de datos. Además, `test_baja_logica.sql` considera "histórico" lo anterior a `CURRENT_DATE - 1` y deja de pasar desde el segundo día posterior a la generación, y `test_datos_prueba.sql` y `test_ventas_diarias_estructura.sql` necesitan datos del día actual: dependen de la fecha, no de un defecto del código de los scripts.
+- **Decisiones de modelado con costo.** La categoría **no se congela** a la fecha de venta (se usa la categoría actual del producto, igual que la consulta de la consigna); el día de negocio usa una zona fija (`America/Argentina/Buenos_Aires`) y cambiarla exige reconstruir los totales; `ventas_diarias_categoria` usa PK natural, `DATE` y `NUMERIC(14,2)`, desviaciones justificadas de las directivas de DDL de `AGENTS.md`.
+- **Alcance de la Parte 1.** Las dependencias funcionales provienen de la regla de negocio de la consigna: una instancia de tres filas es coherente con ellas pero no las prueba. Las tablas `lote`, `deposito` y `usuario` son mínimas y aisladas (no se integran con el esquema del Proyecto Integrador).
+- **Integración pendiente.** Los scripts todavía no están incorporados a `Proyecto_Integrador/` ni a su informe consolidado. Al integrarlos hay que decidir cómo se incorpora `eliminado` a `schema.sql` y recordar que el índice `idx_detalle_producto_id` (que usa `trg_vdc_producto`) viene del TP3 y no está en ese `schema.sql`.
