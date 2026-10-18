@@ -110,9 +110,9 @@
 
 ## 13. Integración al Proyecto Integrador (sólo tras confirmación del usuario)
 
-- [ ] 13.1 Preguntar al usuario: nombres de archivo destino y si `eliminado` se incorpora a `Proyecto_Integrador/database/schema.sql` o queda como script aparte; recordar que `idx_detalle_producto_id` (usado por `trg_vdc_producto`) no está en `schema.sql`.
-- [ ] 13.2 Copiar/adaptar los scripts a `Proyecto_Integrador/database/` según lo acordado; verificar que corren sobre `tp4_foodstore` sin errores. Commit separado: `feat(tp4): integrar FNBC y desnormalización al proyecto integrador`.
-- [ ] 13.3 Agregar la sección TP4 a `Proyecto_Integrador/documentos/TPI_FoodStore_Informe_Tecnico_Consolidado.md`; verificar enlaces a scripts. Commit separado: `docs(tp4): incorporar TP4 al informe técnico consolidado`.
+- [x] 13.1 Preguntar al usuario: nombres de archivo destino y si `eliminado` se incorpora a `Proyecto_Integrador/database/schema.sql` o queda como script aparte; recordar que `idx_detalle_producto_id` (usado por `trg_vdc_producto`) no está en `schema.sql`.
+- [x] 13.2 Copiar/adaptar los scripts a `Proyecto_Integrador/database/` según lo acordado; verificar que corren sobre `tp4_foodstore` sin errores. Commit separado: `feat(tp4): integrar FNBC y desnormalización al proyecto integrador`.
+- [x] 13.3 Agregar la sección TP4 a `Proyecto_Integrador/documentos/TPI_FoodStore_Informe_Tecnico_Consolidado.md`; verificar enlaces a scripts. Commit separado: `docs(tp4): incorporar TP4 al informe técnico consolidado`.
 
 ## 14. Cierre
 
