@@ -6,7 +6,7 @@
 |---|---|
 | **Materia** | Base de Datos II |
 | **Trabajo** | TP Unidad 4 – Forma Normal de Boyce-Codd y desnormalización controlada |
-| **Autor** | Matías Limina |
+| **Integrantes** | Matías Limina, Nicolás Monjelardi, Lautaro Agüero |
 | **Fecha** | 2026-10-18 (fecha de las mediciones y de la verificación) |
 | **Motor / base** | PostgreSQL 18.6 – base de trabajo `tp4_foodstore` (copia de `food_store_copia`) |
 | **Repositorio** | https://github.com/MatiasLimina/BaseDeDatos2.git (carpeta `TP4/`) |
