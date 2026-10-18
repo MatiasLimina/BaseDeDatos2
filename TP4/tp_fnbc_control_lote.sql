@@ -203,9 +203,9 @@ SELECT (SELECT count(*) FROM control_lote_almacen)   AS filas_original,
 -- -----------------------------------------------------------------------------
 BEGIN;
 INSERT INTO usuario (id, nombre, apellido) OVERRIDING SYSTEM VALUE
-VALUES (803, 'Responsable', 'Ochocientos Tres');
-INSERT INTO responsable_deposito (responsable_control_id, deposito_id) VALUES (803, 30);
-INSERT INTO control_lote (lote_id, responsable_control_id) VALUES (501, 803);   -- aceptado
+VALUES (900803, 'Responsable', 'Ochocientos Tres');
+INSERT INTO responsable_deposito (responsable_control_id, deposito_id) VALUES (900803, 30);
+INSERT INTO control_lote (lote_id, responsable_control_id) VALUES (501, 900803);   -- aceptado
 -- La vista muestra DOS responsables para (lote 501, deposito 30):
 SELECT * FROM v_control_lote_almacen WHERE lote_id = 501 ORDER BY responsable_control_id;
 ROLLBACK;

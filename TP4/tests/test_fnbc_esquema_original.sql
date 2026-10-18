@@ -59,4 +59,4 @@ BEGIN
 
     RAISE NOTICE 'OK test_fnbc_esquema_original';
 END
-$$
+$$;

@@ -50,7 +50,7 @@ BEGIN
         INSERT INTO control_lote (lote_id, responsable_control_id)
         VALUES (501, 801), (502, 801), (503, 802) ON CONFLICT DO NOTHING;
         INSERT INTO usuario (id, nombre, apellido) OVERRIDING SYSTEM VALUE
-        VALUES (803, 'Responsable', 'Ochocientos Tres');
+        VALUES (900803, 'Responsable', 'Ochocientos Tres');
 
         -- 5) Un responsable pertenece a un unico deposito: 801 -> 31 rechazado por PK
         v_rechazo := FALSE;
@@ -69,8 +69,8 @@ BEGIN
 
         -- 6) control_lote exige responsable con deposito asignado (FK a responsable_deposito)
         v_rechazo := FALSE;
-        BEGIN  -- 803 existe en usuario pero NO en responsable_deposito
-            INSERT INTO control_lote (lote_id, responsable_control_id) VALUES (501, 803);
+        BEGIN  -- 900803 existe en usuario pero NO en responsable_deposito
+            INSERT INTO control_lote (lote_id, responsable_control_id) VALUES (501, 900803);
         EXCEPTION WHEN foreign_key_violation THEN v_rechazo := TRUE;
         END;
         ASSERT v_rechazo, 'control_lote con responsable sin deposito deberia violar la FK';

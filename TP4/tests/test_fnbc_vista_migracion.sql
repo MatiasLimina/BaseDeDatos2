@@ -55,16 +55,16 @@ BEGIN
     --    segundo responsable del deposito 30 para el lote 501 y la vista muestra dos filas.
     BEGIN
         INSERT INTO usuario (id, nombre, apellido) OVERRIDING SYSTEM VALUE
-        VALUES (803, 'Responsable', 'Ochocientos Tres');
-        INSERT INTO responsable_deposito (responsable_control_id, deposito_id) VALUES (803, 30);
-        INSERT INTO control_lote (lote_id, responsable_control_id) VALUES (501, 803);  -- aceptado
+        VALUES (900803, 'Responsable', 'Ochocientos Tres');
+        INSERT INTO responsable_deposito (responsable_control_id, deposito_id) VALUES (900803, 30);
+        INSERT INTO control_lote (lote_id, responsable_control_id) VALUES (501, 900803);  -- aceptado
         SELECT count(*), count(DISTINCT responsable_control_id) INTO v_n, v_n2
         FROM   v_control_lote_almacen WHERE lote_id = 501 AND deposito_id = 30;
         ASSERT v_n = 2 AND v_n2 = 2,
                'la vista debia mostrar 2 responsables para (501,30): filas=' || v_n || ' distintos=' || v_n2;
         -- Triangulacion: la tabla ORIGINAL si lo rechaza (PK (lote, deposito))
         BEGIN
-            INSERT INTO control_lote_almacen (lote_id, deposito_id, responsable_control_id) VALUES (501, 30, 803);
+            INSERT INTO control_lote_almacen (lote_id, deposito_id, responsable_control_id) VALUES (501, 30, 900803);
             ASSERT FALSE, 'la tabla original debia rechazar el duplicado (501,30)';
         EXCEPTION WHEN unique_violation THEN NULL;
         END;
