@@ -39,6 +39,7 @@ BEGIN
         ASSERT t4_vdc_total(v_hoy, 1) = b1 + 100.00, 'A2: cat 1 no debia cambiar';
         INSERT INTO pedido_detalle (pedido_id, producto_id, cantidad, precio_unitario, subtotal, eliminado) VALUES (v_p, 20, 1, 77.00, 77.00, TRUE);
         ASSERT t4_vdc_total(v_hoy, 1) = b1 + 100.00 AND t4_vdc_lineas(v_hoy, 1) = l1 + 1, 'A3: un detalle eliminado no suma';
+        ASSERT (SELECT count(*) FROM v_auditoria_ventas_diarias) = 0, 'auditoria != 0 filas tras el escenario';
         RAISE EXCEPTION 'rollback' USING ERRCODE = 'T4RB1';
     EXCEPTION WHEN SQLSTATE 'T4RB1' THEN NULL;
     END;
@@ -53,6 +54,7 @@ BEGIN
         UPDATE pedido_detalle SET subtotal = 90.00 WHERE pedido_id = v_p AND producto_id = 10;
         ASSERT t4_vdc_total(v_hoy, 1) = b1 - 10.00, 'B2: delta = ' || (t4_vdc_total(v_hoy, 1) - b1);
         ASSERT t4_vdc_lineas(v_hoy, 1) = l1, 'B: las lineas no cambian al modificar el subtotal';
+        ASSERT (SELECT count(*) FROM v_auditoria_ventas_diarias) = 0, 'auditoria != 0 filas tras el escenario';
         RAISE EXCEPTION 'rollback' USING ERRCODE = 'T4RB1';
     EXCEPTION WHEN SQLSTATE 'T4RB1' THEN NULL;
     END;
@@ -71,6 +73,7 @@ BEGIN
         ASSERT t4_vdc_total(v_hoy, 1) = b1 AND t4_vdc_lineas(v_hoy, 1) = l1, 'C3: cat 1 debia volver al valor inicial';
         UPDATE pedido_detalle SET producto_id = 20 WHERE pedido_id = v_p AND producto_id = 10;  -- misma categoria
         ASSERT t4_vdc_total(v_hoy, 1) = b1 AND t4_vdc_lineas(v_hoy, 1) = l1, 'C4: mismo total dentro de la misma categoria';
+        ASSERT (SELECT count(*) FROM v_auditoria_ventas_diarias) = 0, 'auditoria != 0 filas tras el escenario';
         RAISE EXCEPTION 'rollback' USING ERRCODE = 'T4RB1';
     EXCEPTION WHEN SQLSTATE 'T4RB1' THEN NULL;
     END;
@@ -86,6 +89,7 @@ BEGIN
             UPDATE pedido_detalle SET eliminado = FALSE WHERE pedido_id = v_p AND producto_id = 10;
             ASSERT t4_vdc_total(v_hoy, 1) = b1 AND t4_vdc_lineas(v_hoy, 1) = l1, 'D: reactivacion ciclo ' || i;
         END LOOP;
+        ASSERT (SELECT count(*) FROM v_auditoria_ventas_diarias) = 0, 'auditoria != 0 filas tras el escenario';
         RAISE EXCEPTION 'rollback' USING ERRCODE = 'T4RB1';
     EXCEPTION WHEN SQLSTATE 'T4RB1' THEN NULL;
     END;
@@ -100,6 +104,7 @@ BEGIN
         ASSERT t4_vdc_total(v_hoy, 1) = b1 AND t4_vdc_lineas(v_hoy, 1) = l1, 'E1: borrar un detalle ya eliminado no resta';
         DELETE FROM pedido_detalle WHERE pedido_id = v_p AND producto_id = 10;
         ASSERT t4_vdc_total(v_hoy, 1) = b1 - 100.00 AND t4_vdc_lineas(v_hoy, 1) = l1 - 1, 'E2: el borrado debia restar 100.00';
+        ASSERT (SELECT count(*) FROM v_auditoria_ventas_diarias) = 0, 'auditoria != 0 filas tras el escenario';
         RAISE EXCEPTION 'rollback' USING ERRCODE = 'T4RB1';
     EXCEPTION WHEN SQLSTATE 'T4RB1' THEN NULL;
     END;
@@ -119,6 +124,7 @@ BEGIN
         UPDATE pedido_detalle SET eliminado = FALSE WHERE pedido_id = v_p AND producto_id = 10;
         DELETE FROM pedido_detalle WHERE pedido_id = v_p AND producto_id = 10;  -- borrado fisico de la ultima
         ASSERT NOT EXISTS (SELECT 1 FROM ventas_diarias_categoria WHERE fecha = v_d2), 'F5: la fila debia desaparecer (borrado)';
+        ASSERT (SELECT count(*) FROM v_auditoria_ventas_diarias) = 0, 'auditoria != 0 filas tras el escenario';
         RAISE EXCEPTION 'rollback' USING ERRCODE = 'T4RB1';
     EXCEPTION WHEN SQLSTATE 'T4RB1' THEN NULL;
     END;
@@ -134,6 +140,7 @@ BEGIN
         ASSERT t4_vdc_total(v_d2, 1) = 100.00 AND t4_vdc_lineas(v_d2, 1) = 1, 'G2: el dia lejano debia ganar 100.00';
         UPDATE pedido_detalle SET pedido_id = v_p WHERE pedido_id = v_q AND producto_id = 10;
         ASSERT t4_vdc_total(v_hoy, 1) = b1 AND NOT EXISTS (SELECT 1 FROM ventas_diarias_categoria WHERE fecha = v_d2), 'G3: vuelta atras';
+        ASSERT (SELECT count(*) FROM v_auditoria_ventas_diarias) = 0, 'auditoria != 0 filas tras el escenario';
         RAISE EXCEPTION 'rollback' USING ERRCODE = 'T4RB1';
     EXCEPTION WHEN SQLSTATE 'T4RB1' THEN NULL;
     END;
@@ -148,6 +155,7 @@ BEGIN
         UPDATE pedido_detalle SET eliminado = TRUE WHERE pedido_id = v_p AND producto_id = 10;
         DELETE FROM pedido_detalle WHERE pedido_id = v_p AND producto_id = 10;
         ASSERT t4_vdc_total(v_hoy, 1) = b1 AND t4_vdc_lineas(v_hoy, 1) = l1, 'H2: modificar/borrar el detalle de un pedido eliminado no resta';
+        ASSERT (SELECT count(*) FROM v_auditoria_ventas_diarias) = 0, 'auditoria != 0 filas tras el escenario';
         RAISE EXCEPTION 'rollback' USING ERRCODE = 'T4RB1';
     EXCEPTION WHEN SQLSTATE 'T4RB1' THEN NULL;
     END;
@@ -161,11 +169,13 @@ BEGIN
         VALUES (v_p, 10, 1, 100.00, 100.00), (v_p, 11, 1, 50.00, 50.00), (v_p, 12, 2, 25.00, 50.00);
         SELECT count(*) || '/' || coalesce(sum(total_vendido), 0) || '/' || coalesce(sum(cantidad_lineas), 0) INTO s1 FROM ventas_diarias_categoria;
         ASSERT s1 <> s0, 'I0: las inserciones debian alterar la tabla dentro de la transaccion';
+        ASSERT (SELECT count(*) FROM v_auditoria_ventas_diarias) = 0, 'auditoria != 0 filas tras el escenario';
         RAISE EXCEPTION 'rollback' USING ERRCODE = 'T4RB1';
     EXCEPTION WHEN SQLSTATE 'T4RB1' THEN NULL;
     END;
     SELECT count(*) || '/' || coalesce(sum(total_vendido), 0) || '/' || coalesce(sum(cantidad_lineas), 0) INTO s1 FROM ventas_diarias_categoria;
     ASSERT s1 = s0, 'I1: residuos tras el rollback: antes ' || s0 || ' despues ' || s1;
+    ASSERT (SELECT count(*) FROM v_auditoria_ventas_diarias) = 0, 'auditoria != 0 filas al finalizar el test';
 END $$;
 
 DROP FUNCTION t4_vdc_total(DATE, BIGINT);

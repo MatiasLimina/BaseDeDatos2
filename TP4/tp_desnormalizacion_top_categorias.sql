@@ -371,6 +371,35 @@ ORDER  BY v.total_vendido DESC, c.nombre
 LIMIT  5;
 
 -- =============================================================================
+-- SECCION 6: AUDITORIA DE DESINCRONIZACION
+-- Recalcula desde la fuente de verdad (mismo criterio de contribucion que los disparadores) todo
+-- el historico por (dia de negocio, categoria actual) y lo compara con ventas_diarias_categoria
+-- con FULL OUTER JOIN: devuelve una fila por cada (fecha, categoria_id) cuyo total o cantidad
+-- de lineas difiere, que falta en la tabla redundante o que sobra en ella.
+-- Resultado esperado: 0 filas. Es una tarea de auditoria (recorre todo el historico), no del panel.
+-- =============================================================================
+CREATE OR REPLACE VIEW v_auditoria_ventas_diarias AS
+WITH fuente AS (
+    SELECT fn_dia_negocio(ped.fecha) AS fecha, pr.categoria_id, SUM(dp.subtotal) AS total, COUNT(*)::int AS lineas
+    FROM   pedido_detalle dp
+    JOIN   pedido   ped ON ped.id = dp.pedido_id
+    JOIN   producto pr  ON pr.id  = dp.producto_id
+    WHERE  NOT ped.eliminado AND NOT dp.eliminado
+    GROUP  BY 1, 2
+)
+SELECT COALESCE(f.fecha, v.fecha)               AS fecha,
+       COALESCE(f.categoria_id, v.categoria_id) AS categoria_id,
+       f.total   AS total_fuente,  v.total_vendido    AS total_tabla,
+       f.lineas  AS lineas_fuente, v.cantidad_lineas  AS lineas_tabla
+FROM   fuente f
+FULL   OUTER JOIN ventas_diarias_categoria v ON v.fecha = f.fecha AND v.categoria_id = f.categoria_id
+WHERE  f.total  IS DISTINCT FROM v.total_vendido
+   OR  f.lineas IS DISTINCT FROM v.cantidad_lineas;
+
+-- Ejecucion de la auditoria (0 filas = sincronizada):
+SELECT * FROM v_auditoria_ventas_diarias ORDER BY fecha, categoria_id;
+
+-- =============================================================================
 -- SECCION 7: REVERSION (comentada) - retira la desnormalizacion sin tocar la fuente
 -- Ejecutar dentro de una transaccion si se desea (BEGIN; ...; COMMIT;). No elimina la columna
 -- `eliminado` ni fn_dia_negocio (no forman parte de la desnormalizacion). pedido, pedido_detalle,

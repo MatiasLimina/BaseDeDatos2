@@ -200,8 +200,27 @@ Se publica también como vista `v_top5_categorias_dia` (un `SELECT` simple: el p
 |---|---|---|
 | Execution Time (3 ejecuciones) | 141,857 / 138,899 / 142,337 ms | 0,104 / 0,100 / 0,101 ms |
 | **Mediana** | **141,857 ms** | **0,101 ms** (≈ 1 400 veces menos) |
-| Buffers por ejecución | ≈ 10 600–11 100 (hit + read) | 13 (hit) |
+| Buffers por ejecución | 11 072 (hit + read, igual en las 3 ejecuciones) | 13 (hit) |
 | Nodo dominante | `Parallel Seq Scan` de `pedido_detalle` (771 201 filas, 3 procesos) + `Hash Join` con `Seq Scan` de `producto` | `Bitmap Index Scan` por `pk_ventas_diarias_categoria` (10 filas) |
 | Filas procesadas hasta el agregado | ≈ 137 000 (3 × 45 667) → 10 grupos | 10 |
 
 **Lectura de los planes.** Antes, el trabajo crece con el número de líneas vendidas en el día: se lee entera `pedido_detalle`, se une con 50 000 pedidos del día y 50 005 productos y recién entonces se agrupa en 10 categorías (sólo para quedarse con 5). Después, el filtro `fecha = hoy` usa el prefijo de la PK `(fecha, categoria_id)` y devuelve directamente las 10 filas ya agregadas; el `Hash Join` con `categoria` y el `Sort` operan sobre 10 filas, de modo que el costo ya no depende del volumen de ventas. Los planes completos están en `TP4/evidencias/explain_antes.txt` y `explain_despues.txt`. El precio de esta mejora se paga en escritura: cada alta, cambio o baja de un detalle ejecuta además un upsert sobre la fila `(día, categoría)`.
+
+## e) Auditoría de desincronización
+
+Sección 6 del script, publicada como vista `v_auditoria_ventas_diarias`:
+
+```sql
+WITH fuente AS (
+  SELECT fn_dia_negocio(ped.fecha) AS fecha, pr.categoria_id, SUM(dp.subtotal) AS total, COUNT(*)::int AS lineas
+  FROM pedido_detalle dp JOIN pedido ped ON ped.id = dp.pedido_id JOIN producto pr ON pr.id = dp.producto_id
+  WHERE NOT ped.eliminado AND NOT dp.eliminado GROUP BY 1, 2)
+SELECT COALESCE(f.fecha, v.fecha) AS fecha, COALESCE(f.categoria_id, v.categoria_id) AS categoria_id,
+       f.total AS total_fuente, v.total_vendido AS total_tabla, f.lineas AS lineas_fuente, v.cantidad_lineas AS lineas_tabla
+FROM fuente f FULL OUTER JOIN ventas_diarias_categoria v ON v.fecha = f.fecha AND v.categoria_id = f.categoria_id
+WHERE f.total IS DISTINCT FROM v.total_vendido OR f.lineas IS DISTINCT FROM v.cantidad_lineas;
+```
+
+**Criterio de comparación.** Se recalcula desde la fuente de verdad todo el histórico con el mismo criterio de contribución que los disparadores (`eliminado = FALSE` en pedido y detalle, `fn_dia_negocio`, categoría actual) y se compara con `FULL OUTER JOIN` y `IS DISTINCT FROM` sobre **total y cantidad de líneas**. Una fila de salida significa que la clave `(fecha, categoria_id)` tiene un total distinto, **falta** en la tabla redundante (`total_tabla IS NULL`) o **sobra** en ella (`total_fuente IS NULL`). Recorre todo el historico: es una tarea de auditoría programada, no del panel.
+
+**Evidencia.** Tras la carga inicial y después de ejecutar todos los tests de disparadores la auditoría devuelve **0 filas** (`TP4/evidencias/auditoria.txt`). `test_auditoria.sql` verifica además que detecta, dentro de transacciones revertidas: un total alterado a mano (devuelve exactamente esa fila, con diferencia 1,00), una cantidad de líneas alterada, una fila borrada, una fila de más y una desincronización real de la fuente con el disparador deshabilitado; `test_trigger_detalle.sql` y `test_trigger_pedido_producto.sql` terminan cada escenario con la aserción "auditoría = 0 filas".

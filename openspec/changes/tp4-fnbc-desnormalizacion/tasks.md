@@ -88,10 +88,10 @@
 
 ## 10. Parte 2 – Auditoría (5.2 e)
 
-- [ ] 10.1 RED: escribir `TP4/tests/test_auditoria.sql` (existe `v_auditoria_ventas_diarias` y devuelve 0 filas; dentro de `ROLLBACK`, un `UPDATE` manual de `total_vendido` en una fila hace que la auditoría devuelva exactamente esa fila; borrar a mano una fila también es detectado). Ejecutar → falla por vista inexistente.
-- [ ] 10.2 GREEN: sección 6 del script: consulta de auditoría (recalcula por `fn_dia_negocio` y categoría con `FULL OUTER JOIN` y `IS DISTINCT FROM` en total y líneas) y vista `v_auditoria_ventas_diarias`. Ejecutar + test → pasa; guardar la salida (0 filas) en `TP4/evidencias/auditoria.txt`.
-- [ ] 10.3 TRIANGULATE: agregar la aserción "auditoría = 0 filas" al final de `test_trigger_detalle.sql` y `test_trigger_pedido_producto.sql` (antes del `ROLLBACK`); ejecutar todos los tests de Parte 2 → pasan.
-- [ ] 10.4 Documentar en `informe_tp4.md` el punto e): script, criterio de comparación y evidencia del resultado vacío.
+- [x] 10.1 RED: escribir `TP4/tests/test_auditoria.sql` (existe `v_auditoria_ventas_diarias` y devuelve 0 filas; dentro de `ROLLBACK`, un `UPDATE` manual de `total_vendido` en una fila hace que la auditoría devuelva exactamente esa fila; borrar a mano una fila también es detectado). Ejecutar → falla por vista inexistente.
+- [x] 10.2 GREEN: sección 6 del script: consulta de auditoría (recalcula por `fn_dia_negocio` y categoría con `FULL OUTER JOIN` y `IS DISTINCT FROM` en total y líneas) y vista `v_auditoria_ventas_diarias`. Ejecutar + test → pasa; guardar la salida (0 filas) en `TP4/evidencias/auditoria.txt`.
+- [x] 10.3 TRIANGULATE: agregar la aserción "auditoría = 0 filas" al final de `test_trigger_detalle.sql` y `test_trigger_pedido_producto.sql` (antes del `ROLLBACK`); ejecutar todos los tests de Parte 2 → pasan.
+- [x] 10.4 Documentar en `informe_tp4.md` el punto e): script, criterio de comparación y evidencia del resultado vacío.
 - Commit sugerido: `feat(tp4): script de auditoría de ventas_diarias_categoria`
 
 ## 11. Verificación integral e informe

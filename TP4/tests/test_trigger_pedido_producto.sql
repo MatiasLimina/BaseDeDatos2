@@ -45,6 +45,7 @@ BEGIN
         UPDATE pedido SET eliminado = TRUE WHERE id = v_p;
         UPDATE pedido SET eliminado = TRUE, fecha = now() WHERE id = v_p;
         ASSERT t4_vdc_total(v_hoy, 1) = b1 - 100.00, 'P4: TRUE -> TRUE no debe restar dos veces';
+        ASSERT (SELECT count(*) FROM v_auditoria_ventas_diarias) = 0, 'auditoria != 0 filas tras el escenario';
         RAISE EXCEPTION 'rollback' USING ERRCODE = 'T4RB1';
     EXCEPTION WHEN SQLSTATE 'T4RB1' THEN NULL;
     END;
@@ -64,6 +65,7 @@ BEGIN
         ASSERT t4_vdc_total(v_d2, 1) = 100.00 AND t4_vdc_total(v_d2, 2) = 40.50 AND t4_vdc_lineas(v_d2, 1) = 1, 'Q4: dia lejano';
         UPDATE pedido SET fecha = v_ts2 + INTERVAL '1 hour' WHERE id = v_p;   -- mismo dia de negocio
         ASSERT t4_vdc_total(v_d2, 1) = 100.00 AND t4_vdc_total(v_d2, 2) = 40.50 AND t4_vdc_lineas(v_d2, 1) = 1, 'Q5: mismo dia, sin efecto neto';
+        ASSERT (SELECT count(*) FROM v_auditoria_ventas_diarias) = 0, 'auditoria != 0 filas tras el escenario';
         RAISE EXCEPTION 'rollback' USING ERRCODE = 'T4RB1';
     EXCEPTION WHEN SQLSTATE 'T4RB1' THEN NULL;
     END;
@@ -75,6 +77,7 @@ BEGIN
         INSERT INTO pedido_detalle (pedido_id, producto_id, cantidad, precio_unitario, subtotal) VALUES (v_p, 10, 1, 100.00, 100.00);
         ASSERT t4_vdc_total(v_d2, 1) = 100.00, 'Q6: el pedido de las 23:30 BA debia contarse el 2030-01-15';
         ASSERT t4_vdc_total(v_d2 + 1, 1) = 0, 'Q6: no debia contarse el dia siguiente (UTC)';
+        ASSERT (SELECT count(*) FROM v_auditoria_ventas_diarias) = 0, 'auditoria != 0 filas tras el escenario';
         RAISE EXCEPTION 'rollback' USING ERRCODE = 'T4RB1';
     EXCEPTION WHEN SQLSTATE 'T4RB1' THEN NULL;
     END;
@@ -123,6 +126,7 @@ BEGIN
         UPDATE producto SET nombre = nombre || ' ' WHERE id = 13;
         UPDATE producto SET categoria_id = v_cat13 WHERE id = 13;
         ASSERT t4_vdc_total(v_hoy, v_cat13) = b1, 'R6: un UPDATE sin cambio de categoria no altera los totales';
+        ASSERT (SELECT count(*) FROM v_auditoria_ventas_diarias) = 0, 'auditoria != 0 filas tras el escenario';
         RAISE EXCEPTION 'rollback' USING ERRCODE = 'T4RB1';
     EXCEPTION WHEN SQLSTATE 'T4RB1' THEN NULL;
     END;
@@ -140,9 +144,11 @@ BEGIN
         UPDATE producto SET categoria_id = 3 WHERE id = v_p;
         ASSERT t4_vdc_total(v_d2, 2) = 0 AND t4_vdc_total(v_d2, 3) = 25.00 AND t4_vdc_lineas(v_d2, 3) = 1, 'S3: la unica venta pasa a la categoria 3 y la fila de la 2 desaparece';
         ASSERT NOT EXISTS (SELECT 1 FROM ventas_diarias_categoria WHERE fecha = v_d2 AND categoria_id = 2), 'S3b: la fila vacia debia borrarse';
+        ASSERT (SELECT count(*) FROM v_auditoria_ventas_diarias) = 0, 'auditoria != 0 filas tras el escenario';
         RAISE EXCEPTION 'rollback' USING ERRCODE = 'T4RB1';
     EXCEPTION WHEN SQLSTATE 'T4RB1' THEN NULL;
     END;
+    ASSERT (SELECT count(*) FROM v_auditoria_ventas_diarias) = 0, 'auditoria != 0 filas al finalizar el test';
 END $$;
 
 DROP FUNCTION t4_vdc_total(DATE, BIGINT);
