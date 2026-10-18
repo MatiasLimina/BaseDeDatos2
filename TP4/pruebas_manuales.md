@@ -849,8 +849,7 @@ SELECT * FROM v_auditoria_ventas_diarias;                                     --
   ```
 
 - **Resultado esperado:** dentro de la transacción: `disparadores = 0`, `tabla` vacío (`NULL`), `detalles = 771201` (la fuente intacta) y el top 5 normalizado con las mismas 5 filas de la prueba 17. Tras el `ROLLBACK`: `disparadores = 5` y `filas_vdc = 1756`.
-- [ ] Aprobada
-- **Estado: no ejecutada por el autor.**
+- [x] Aprobada. Observado por el autor: dentro de la transacción `disparadores = 0`, `tabla = NULL`, `detalles = 771201` y el top 5 normalizado igual al de la prueba 17; tras el `ROLLBACK`, `disparadores = 5` y `filas_vdc = 1756`. (Hallazgo: la vista temporal `t_delta` bloqueaba el `DROP TABLE` con error 2BP01; la guía se corrigió en `a1f0db4`.)
 
 ---
 
@@ -864,8 +863,8 @@ SELECT * FROM v_auditoria_ventas_diarias;                                     --
 | D. Top 5 y medición | 17, 18, 19 | [x] 17  [x] 18  [x] 19 |
 | E. Disparadores | 20, 21, 22 | [x] 20  [x] 21  [x] 22 |
 | F. Auditoría | 23, 24, 25 | [x] 23  [x] 24  [x] 25 |
-| G. TRUNCATE, concurrencia, reversión | 26, 27, 28 | [x] 26  [~] 27 (sólo variante 1)  [ ] 28 (variantes 2 a 4 de la 27 y la 28: no ejecutadas por el autor) |
+| G. TRUNCATE, concurrencia, reversión | 26, 27, 28 | [x] 26  [~] 27 (sólo variante 1)  [x] 28 (variantes 2 a 4 de la 27: no ejecutadas por el autor) |
 
-- [ ] **Todas las pruebas (28) aprobadas.** Estado: **26 de 28 pruebas aprobadas completas (1 a 26) más la 27 parcial (sólo la variante 1)**. Las variantes 2, 3 y 4 de la prueba 27 y la prueba 28 (reversión) **no fueron ejecutadas por el autor**; `FOR SHARE` se probó en vivo para baja lógica vs alta de detalle, pero no para la reactivación, y la 28 sólo está cubierta por los tests automáticos (`test_reversibilidad`, `test_concurrencia`) y por la ejecución del agente vía MCP.
+- [ ] **Todas las pruebas (28) aprobadas.** Estado: **27 de 28 pruebas aprobadas completas (todas menos la 27, que es parcial: sólo la variante 1)**. Las variantes 2, 3 y 4 de la prueba 27 **no fueron ejecutadas por el autor**; `FOR SHARE` se probó en vivo para baja lógica vs alta de detalle, pero no para la reactivación.
 - Ejecutado por: Matías Limina   Fecha: 2026-10-18   Equipo / PostgreSQL: equipo del autor / PostgreSQL 18.6
 - Observaciones (pruebas que fallaron y por qué): ninguna falló en la versión final. Durante las corridas se detectaron y corrigieron dos defectos reales: falso positivo de `test_concurrencia` por comentarios (`46d3da5`) y categorías duplicadas por la codificación de `psql` en Windows (`7417b2d`).
