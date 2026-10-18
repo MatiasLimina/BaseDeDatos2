@@ -1,0 +1,13 @@
+-- Evidencia: auditoria de ventas_diarias_categoria (seccion 6 del script), tp4_foodstore, 2026-10-18.
+-- Ejecutada (a) tras la carga inicial y (b) despues de correr todos los tests de disparadores
+-- (cada uno revierte sus datos). Resultado en ambos casos: 0 filas.
+--
+-- Origen: salida de la consulta ejecutada mediante el MCP `postgres` (herramienta `query`), NO desde una
+-- sesion psql; el formato tabular de abajo es una transcripcion (resultado real: rowCount = 0).
+-- tp4_foodstore=> SELECT * FROM v_auditoria_ventas_diarias ORDER BY fecha, categoria_id;
+--  fecha | categoria_id | total_fuente | total_tabla | lineas_fuente | lineas_tabla
+-- -------+--------------+--------------+-------------+---------------+--------------
+-- (0 filas)
+--
+-- Estado de la base al momento de la auditoria: pedido=250002, pedido_detalle=771201,
+-- ventas_diarias_categoria=1756 filas (10 categorias x dias con ventas).
