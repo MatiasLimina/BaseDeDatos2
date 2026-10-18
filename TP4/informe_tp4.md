@@ -278,6 +278,59 @@ Todo pasa por `fn_vdc_aplicar`: con delta positivo hace `INSERT ... ON CONFLICT 
 
 **Casos borde verificados** (`test_trigger_detalle.sql`, `test_trigger_pedido_producto.sql`, con deltas exactos): alta +100,00; subtotal 100→250 = +150,00; cambio de producto entre categorías y dentro de la misma; baja lógica/reactivación (dos ciclos); borrado físico (también de un detalle ya eliminado: no resta); la fila desaparece al quitar la última línea; cambio de `pedido_id` del detalle; detalle de un pedido eliminado no suma; baja lógica de pedido con dos categorías y reactivación (el detalle ya eliminado no reaparece); `TRUE → TRUE` no resta dos veces; cambio de fecha hoy→ayer→día lejano y dentro del mismo día; pedido de las 23:30 con sesión en UTC; recategorización con ventas en varios días, con productos sin ventas y con detalle/pedido eliminados; `ROLLBACK` sin residuos.
 
+**Evidencia de ejecución manual de los disparadores** (pruebas 20, 21 y 22; cada paso compara `ventas_diarias_categoria` contra una copia tomada antes, dentro de una transacción que termina en `ROLLBACK`).
+
+Prueba 20, disparador de `pedido_detalle` (delta acumulado respecto de la copia inicial, columnas `fecha | categoria_id | delta_total | delta_lineas`):
+
+| Paso | Operación | Delta observado |
+|------|-----------|-----------------|
+| 1 | alta de un detalle de 100,00 (producto 10, categoría 1) | categoría 1: +100 (1 línea) |
+| 2 | el subtotal pasa de 100,00 a 250,00 | categoría 1: +250 (1 línea) |
+| 3 | el detalle cambia al producto 11 (categoría 2) | categoría 2: +250 (1 línea); la 1 vuelve a su valor original |
+| 4 | baja lógica del detalle | sin filas (la línea se resta) |
+| 5 | reactivación | categoría 2: +250 (1 línea) |
+| 6 | borrado físico | sin filas |
+| 7 | auditoría | 0 filas |
+
+![Prueba 20, paso 1](evidencias/capturas/p20_a_detalle_alta_cat1_mas100.png)
+*Figura 24 – Prueba 20, paso 1: el alta de un detalle de 100,00 suma +100 y 1 línea a la categoría 1 del día.*
+
+![Prueba 20, paso 3](evidencias/capturas/p20_b_detalle_cambio_producto_cat2_mas250.png)
+*Figura 25 – Prueba 20, paso 3: al cambiar el detalle al producto 11 el aporte de 250 pasa a la categoría 2 (+250, 1 línea).*
+
+![Prueba 20, paso 7](evidencias/capturas/p20_c_detalle_auditoria_cero.png)
+*Figura 26 – Prueba 20, paso 7: la auditoría devuelve 0 filas después de todas las operaciones.*
+
+Prueba 21, disparador de `pedido`:
+
+| Paso | Operación | Delta observado |
+|------|-----------|-----------------|
+| 1 | pedido de hoy con dos detalles | categoría 1: +100 (1 línea); categoría 2: +50 (1 línea) |
+| 2 | baja lógica del pedido | sin filas |
+| 3 | reactivación del pedido | vuelven categoría 1 +100 y categoría 2 +50 |
+| 4 | la fecha del pedido pasa a ayer (2026-10-17) | los mismos deltas (+100 y +50) en la fecha 2026-10-17 |
+| 5 | auditoría | 0 filas |
+
+![Prueba 21, paso 1](evidencias/capturas/p21_a_pedido_alta_dos_categorias.png)
+*Figura 27 – Prueba 21, paso 1: un pedido con dos detalles suma +100 a la categoría 1 y +50 a la categoría 2.*
+
+![Prueba 21, paso 4](evidencias/capturas/p21_b_pedido_cambio_fecha_a_ayer.png)
+*Figura 28 – Prueba 21, paso 4: al mover el pedido a ayer, los mismos deltas (+100 y +50) aparecen en la fecha 2026-10-17.*
+
+![Prueba 21, auditoría](evidencias/capturas/p21_c_pedido_auditoria_cero.png)
+*Figura 29 – Prueba 21: la auditoría devuelve 0 filas tras los cambios de estado y de fecha.*
+
+Prueba 22, disparador de `producto` (recategorización del producto 10, de la categoría 1 a la 3):
+
+![Prueba 22, valores esperados](evidencias/capturas/p22_a_producto10_total_lineas_dias.png)
+*Figura 30 – Prueba 22: antes de recategorizar, el producto 10 tiene 22.349,10 en ventas vigentes, 8 líneas y 6 días con ventas.*
+
+![Prueba 22, deltas](evidencias/capturas/p22_b_recategorizacion_delta_cat1_cat3.png)
+*Figura 31 – Prueba 22: al recategorizar, la categoría 1 pierde 22.349,10 y 8 líneas y la categoría 3 gana lo mismo, en los mismos 6 días.*
+
+![Prueba 22, auditoría](evidencias/capturas/p22_c_recategorizacion_auditoria_cero.png)
+*Figura 32 – Prueba 22: la auditoría devuelve 0 filas después de la recategorización.*
+
 **Concurrencia.** El análisis completo está también en el script (sección 4) y en `design.md` (decisión 14); aquí el resumen. Se trabaja en `READ COMMITTED`.
 
 *Escenario sin protección (T1/T2), paso a paso.* (1) T1 ejecuta `UPDATE pedido SET eliminado = TRUE WHERE id = 7`; su disparador lee los detalles del pedido 7 y **resta** su aporte. (2) T2, antes de que T1 confirme, ejecuta `INSERT INTO pedido_detalle (pedido_id = 7, ...)`; su disparador lee el pedido 7, lo ve todavía con `eliminado = FALSE` y **suma** la línea. (3) Ambas confirman. T1 no vio el detalle de T2 y T2 no vio la baja de T1: queda una línea sumada que nadie restó (total de más; la auditoría lo detecta). Con `producto.categoria_id` ocurre lo análogo.
@@ -294,7 +347,16 @@ Todo pasa por `fn_vdc_aplicar`: con delta positivo hace `INSERT ... ON CONFLICT 
 
 *Reconstrucción.* Si la auditoría devuelve filas, se vuelve a ejecutar el bloque de instalación (`LOCK TABLE ... SHARE ROW EXCLUSIVE` + `TRUNCATE ventas_diarias_categoria` + carga inicial), que es idempotente y deja la tabla igual a la fuente; mientras corre, las escrituras en las fuentes esperan.
 
-*`TRUNCATE`.* `TRUNCATE` de `pedido` o `pedido_detalle` no dispara disparadores de fila y desincronizaría la tabla sin aviso, por eso un disparador `BEFORE TRUNCATE` (`trg_vdc_truncate_pedido`, `trg_vdc_truncate_detalle`) lo rechaza con un error explícito (verificado en `test_concurrencia.sql`); `TRUNCATE producto` ya lo impiden las FK y con `CASCADE` (también `TRUNCATE categoria CASCADE`) la cascada alcanza a `pedido_detalle` y dispara el mismo bloqueo, por lo que la sentencia aborta (verificado en `test_concurrencia.sql`). Para vaciar las fuentes se usa `DELETE` (que sí sincroniza) o se retira antes la desnormalización.
+*`TRUNCATE`.* `TRUNCATE` de `pedido` o `pedido_detalle` no dispara disparadores de fila y desincronizaría la tabla sin aviso, por eso un disparador `BEFORE TRUNCATE` (`trg_vdc_truncate_pedido`, `trg_vdc_truncate_detalle`) lo rechaza con un error explícito (verificado en `test_concurrencia.sql`); `TRUNCATE producto` ya lo impiden las FK y con `CASCADE` (también `TRUNCATE categoria CASCADE`) la cascada alcanza a `pedido_detalle` y dispara el mismo bloqueo, por lo que la sentencia aborta (verificado en `test_concurrencia.sql`). Para vaciar las fuentes se usa `DELETE` (que sí sincroniza) o se retira antes la desnormalización. En la ejecución manual (prueba 26) ambos `TRUNCATE` fueron rechazados y los conteos quedaron intactos.
+
+![TRUNCATE de pedido_detalle rechazado](evidencias/capturas/p26_a_truncate_pedido_detalle_rechazado.png)
+*Figura 33 – Prueba 26: `TRUNCATE` de `pedido_detalle` rechazado por `fn_vdc_bloquear_truncate()` (error 0A000).*
+
+![TRUNCATE de pedido rechazado](evidencias/capturas/p26_b_truncate_pedido_rechazado.png)
+*Figura 34 – Prueba 26: `TRUNCATE` de `pedido` rechazado por el mismo disparador `BEFORE TRUNCATE` (error 0A000).*
+
+![Conteos intactos](evidencias/capturas/p26_c_conteos_intactos.png)
+*Figura 35 – Prueba 26: tras los intentos, la fuente sigue intacta (771.201 detalles y 250.002 pedidos).*
 
 *Alcance de la garantía.* Con `FOR SHARE` (también sobre pedidos eliminados) y los disparadores la tabla queda consistente en los **escenarios de concurrencia analizados** (baja y reactivación de pedido, alta de detalle, en ambos órdenes, en `READ COMMITTED`); **no es una garantía absoluta**: quedan la carrera residual, el caso exótico y cualquier interleaving no contemplado en este análisis, y por eso existe la auditoría. Recategorizar un producto con mucho historial es costoso (usa `idx_detalle_producto_id`, que viene del TP3 y no está en `schema.sql` del integrador).
 
@@ -314,28 +376,28 @@ LIMIT  5;
 Se publica también como vista `v_top5_categorias_dia` (un `SELECT` simple: el planificador la expande y el plan es el mismo). `test_reporte_top5.sql` verifica que devuelve las mismas 5 filas, en el mismo orden y con los mismos montos que la consulta normalizada (`EXCEPT` en ambos sentidos = 0, comparando además la posición con `row_number()`), y repite la comparación después de hacer entrar a la categoría del 6.º puesto al top 5 con una venta adicional (revertida).
 
 ![Top 5 normalizado](evidencias/capturas/p17_a_top5_normalizado.png)
-*Figura 24 – Prueba 17: top 5 de la consulta normalizada (Lácteos, Congelados, Golosinas, Panadería, Carnes).*
+*Figura 36 – Prueba 17: top 5 de la consulta normalizada (Lácteos, Congelados, Golosinas, Panadería, Carnes).*
 
 ![Top 5 desnormalizado](evidencias/capturas/p17_b_top5_desnormalizado.png)
-*Figura 25 – Prueba 17: la consulta sobre `ventas_diarias_categoria` devuelve las mismas 5 categorías, con los mismos montos y el mismo orden que la Figura 24.*
+*Figura 37 – Prueba 17: la consulta sobre `ventas_diarias_categoria` devuelve las mismas 5 categorías, con los mismos montos y el mismo orden que la Figura 36.*
 
 | | Antes (normalizada) – agente (MCP) | Antes – autor (DBeaver) | Después (desnormalizada) – agente (MCP) | Después – autor (DBeaver) |
 |---|---|---|---|---|
 | Execution Time | 141,857 / 138,899 / 142,337 ms (3 ejecuciones) | 139,769 ms (1 ejecución) | 0,104 / 0,100 / 0,101 ms (3 ejecuciones) | 0,112 ms (1 ejecución) |
 | **Valor de referencia** | **141,857 ms** (mediana) | **139,769 ms** | **0,101 ms** (mediana; ≈ 1 400 veces menos) | **0,112 ms** (≈ 1 250 veces menos) |
 | Buffers por ejecución | 11 072 (hit + read, igual en las 3) | 11 077 (hit) | 13 (hit) | 12 (hit) |
-| Nodo dominante | `Parallel Seq Scan` de `pedido_detalle` (771 201 filas, 3 procesos) + `Hash Join` con `Seq Scan` de `producto` | el mismo (Figuras 18 a 21) | `Bitmap Index Scan` por `pk_ventas_diarias_categoria` (10 filas) | el mismo (Figuras 26 y 27) |
+| Nodo dominante | `Parallel Seq Scan` de `pedido_detalle` (771 201 filas, 3 procesos) + `Hash Join` con `Seq Scan` de `producto` | el mismo (Figuras 18 a 21) | `Bitmap Index Scan` por `pk_ventas_diarias_categoria` (10 filas) | el mismo (Figuras 38 y 39) |
 | Filas procesadas hasta el agregado | ≈ 137 000 (3 × 45 667) → 10 grupos | – | 10 | 10 |
 
-*Fuente de cada columna: «agente» = mediciones automatizadas a través del MCP `postgres` (`TP4/evidencias/explain_*.txt`); «autor» = corrida manual del propio autor en DBeaver sobre la misma base, el mismo día, una sola ejecución por consulta (Figuras 18 a 21 y 26 y 27). Las diferencias entre columnas (≈ 1,5 % antes; 0,10 frente a 0,11 ms después) son variación normal entre equipos y ejecuciones; la conclusión (orden de magnitud y cambio de plan) es la misma en ambas fuentes.*
+*Fuente de cada columna: «agente» = mediciones automatizadas a través del MCP `postgres` (`TP4/evidencias/explain_*.txt`); «autor» = corrida manual del propio autor en DBeaver sobre la misma base, el mismo día, una sola ejecución por consulta (Figuras 18 a 21 y 38 y 39). Las diferencias entre columnas (≈ 1,5 % antes; 0,10 frente a 0,11 ms después) son variación normal entre equipos y ejecuciones; la conclusión (orden de magnitud y cambio de plan) es la misma en ambas fuentes.*
 
 **Lectura de los planes.** Antes, el trabajo crece con el número de líneas vendidas en el día: se lee entera `pedido_detalle`, se une con 50 000 pedidos del día y 50 005 productos y recién entonces se agrupa en 10 categorías (sólo para quedarse con 5). Después, el filtro `fecha = hoy` usa el prefijo de la PK `(fecha, categoria_id)` y devuelve directamente las 10 filas ya agregadas; el `Hash Join` con `categoria` y el `Sort` operan sobre 10 filas, de modo que el costo ya no depende del volumen de ventas. Los planes completos están en `TP4/evidencias/explain_antes.txt` y `explain_despues.txt`. El precio de esta mejora se paga en escritura: cada alta, cambio o baja de un detalle ejecuta además un upsert sobre la fila `(día, categoría)`.
 
 ![EXPLAIN después, plan](evidencias/capturas/p19_explain_despues_plan.png)
-*Figura 26 – Prueba 19, consulta desnormalizada: `Bitmap Index Scan` sobre `pk_ventas_diarias_categoria` (10 filas), `Hash Join` con `categoria` y `Sort`; 12 buffers.*
+*Figura 38 – Prueba 19, consulta desnormalizada: `Bitmap Index Scan` sobre `pk_ventas_diarias_categoria` (10 filas), `Hash Join` con `categoria` y `Sort`; 12 buffers.*
 
 ![EXPLAIN después, tiempos](evidencias/capturas/p19_explain_despues_tiempos.png)
-*Figura 27 – Prueba 19: Planning Time 0,233 ms y Execution Time 0,112 ms de la consulta desnormalizada.*
+*Figura 39 – Prueba 19: Planning Time 0,233 ms y Execution Time 0,112 ms de la consulta desnormalizada.*
 
 ## e) Auditoría de desincronización
 
@@ -354,7 +416,22 @@ WHERE f.total IS DISTINCT FROM v.total_vendido OR f.lineas IS DISTINCT FROM v.ca
 
 **Criterio de comparación.** Se recalcula desde la fuente de verdad todo el histórico con el mismo criterio de contribución que los disparadores (`eliminado = FALSE` en pedido y detalle, `fn_dia_negocio`, categoría actual) y se compara con `FULL OUTER JOIN` y `IS DISTINCT FROM` sobre **total y cantidad de líneas**. Una fila de salida significa que la clave `(fecha, categoria_id)` tiene un total distinto, **falta** en la tabla redundante (`total_tabla IS NULL`) o **sobra** en ella (`total_fuente IS NULL`). Recorre todo el historico: es una tarea de auditoría programada, no del panel.
 
-**Evidencia.** Tras la carga inicial y después de ejecutar todos los tests de disparadores la auditoría devuelve **0 filas** (`TP4/evidencias/auditoria.txt`, obtenida mediante el MCP `postgres`, no desde una sesión `psql`). `test_auditoria.sql` verifica además que detecta, dentro de transacciones revertidas: un total alterado a mano (devuelve exactamente esa fila, con diferencia 1,00), una cantidad de líneas alterada, una fila borrada, una fila de más y una desincronización real de la fuente con el disparador deshabilitado; `test_trigger_detalle.sql` y `test_trigger_pedido_producto.sql` terminan cada escenario con la aserción "auditoría = 0 filas".
+**Evidencia.** Tras la carga inicial y después de ejecutar todos los tests de disparadores la auditoría devuelve **0 filas** (`TP4/evidencias/auditoria.txt`, obtenida mediante el MCP `postgres`, no desde una sesión `psql`). `test_auditoria.sql` verifica además que detecta, dentro de transacciones revertidas: un total alterado a mano (devuelve exactamente esa fila, con diferencia 1,00), una cantidad de líneas alterada, una fila borrada, una fila de más y una desincronización real de la fuente con el disparador deshabilitado; `test_trigger_detalle.sql` y `test_trigger_pedido_producto.sql` terminan cada escenario con la aserción "auditoría = 0 filas". En la ejecución manual (pruebas 23 a 25) la auditoría dio 0 filas antes y después de todas las pruebas, y detectó las dos alteraciones provocadas.
+
+![Auditoría vacía antes](evidencias/capturas/p23_auditoria_vacia_antes.png)
+*Figura 40 – Prueba 23: la vista `v_auditoria_ventas_diarias` no devuelve filas en una base sincronizada (sólo se ven las columnas).*
+
+![Auditoría detecta total alterado](evidencias/capturas/p24_a_auditoria_detecta_total_alterado.png)
+*Figura 41 – Prueba 24 (a): con el total de la categoría 1 alterado a mano (+1,00), la auditoría devuelve esa fila: 83.107.897,56 en la fuente frente a 83.107.898,56 en la tabla, 15.000 líneas.*
+
+![Auditoría detecta fila borrada](evidencias/capturas/p24_b_auditoria_detecta_fila_borrada.png)
+*Figura 42 – Prueba 24 (b): además se borra la fila de la categoría 2; la auditoría la informa con total 30.069.120,34 y 11.001 líneas en la fuente y NULL en la tabla.*
+
+![Auditoría tras ROLLBACK](evidencias/capturas/p24_c_auditoria_cero_tras_rollback.png)
+*Figura 43 – Prueba 24: tras el `ROLLBACK` de las alteraciones, la auditoría vuelve a 0 filas.*
+
+![Estado final](evidencias/capturas/p25_filas_vdc_y_disparadores.png)
+*Figura 44 – Prueba 25: al final de todas las pruebas la tabla conserva 1.756 filas y existen los 5 disparadores `trg_vdc_*`; la auditoría devolvió 0 filas (esa captura no se incluye porque un tooltip de DBeaver tapaba los encabezados).*
 
 
 
@@ -392,21 +469,24 @@ Resultado de la verificación final sobre `tp4_foodstore` (2026-10-18), con el e
 | Parte 2 d) consulta y medición final | sección d); `evidencias/explain_despues.txt`; test 11 |
 | Parte 2 e) auditoría | sección e); `evidencias/auditoria.txt`; test 12 |
 
-Las 28 pruebas manuales de `TP4/pruebas_manuales.md` repiten estas comprobaciones con SQL listo para pegar y cubren además la ejecución de los scripts con `psql -f` y la prueba de concurrencia con dos sesiones. El autor ejecutó y aprobó las pruebas 1 a 19; las pruebas 20 a 28 siguen pendientes (ver la sección siguiente).
+Las 28 pruebas manuales de `TP4/pruebas_manuales.md` repiten estas comprobaciones con SQL listo para pegar y cubren además la ejecución de los scripts con `psql -f` y la prueba de concurrencia con dos sesiones. El autor ejecutó y aprobó las pruebas 1 a 26; las pruebas 27 y 28 siguen pendientes (ver la sección siguiente).
 
 
 # Evidencia de ejecución manual
 
-El autor ejecutó a mano, sobre `tp4_foodstore` y el 2026-10-18, las **pruebas 1 a 19** de `TP4/pruebas_manuales.md`, y **todas dieron el resultado esperado**:
+El autor ejecutó a mano, sobre `tp4_foodstore` y el 2026-10-18, las **pruebas 1 a 26** de `TP4/pruebas_manuales.md`, y **todas dieron el resultado esperado**:
 
 | Pruebas | Qué cubren | Evidencia en este informe |
 |---------|------------|---------------------------|
-| 1 a 3 | `psql -v ON_ERROR_STOP=1 -f` de los dos scripts (carga limpia y re-ejecución) y la suite de tests automáticos: **14/14** | sin captura (salida de `psql`) |
+| 1 a 3 | `psql -v ON_ERROR_STOP=1 -f` de los dos scripts (carga limpia y re-ejecución) y la suite de tests automáticos: **14/14** (tras el fix de `test_concurrencia`) | sin captura (salida de `psql`) |
 | 4 a 12 | Parte 1: instancia original, PK/FK, violación de FNBC, tres anomalías, descomposición, migración, vista y dependencia no preservada | Figuras 1 a 17 |
-| 13 a 17 | Parte 2 base: `eliminado`, día de negocio, datos del día, estructura y carga inicial de `ventas_diarias_categoria`, top 5 desnormalizado = normalizado | Figuras 22 a 25 |
-| 18 y 19 | `EXPLAIN (ANALYZE, BUFFERS)` antes y después | Figuras 18 a 21 y 26 y 27 |
+| 13 a 17 | Parte 2 base: `eliminado`, día de negocio, datos del día, estructura y carga inicial de `ventas_diarias_categoria`, top 5 desnormalizado = normalizado | Figuras 22 a 23, 36 y 37 |
+| 18 y 19 | `EXPLAIN (ANALYZE, BUFFERS)` antes y después | Figuras 18 a 21 y 38 y 39 |
+| 20 a 22 | Disparadores de `pedido_detalle`, `pedido` y `producto` | Figuras 24 a 32 |
+| 23 a 25 | Auditoría: vacía antes, detecta alteraciones, vacía al final | Figuras 40 a 44 |
+| 26 | `TRUNCATE` de las fuentes bloqueado | Figuras 33 a 35 |
 
-Pendientes de ejecución manual: las pruebas 20 a 28 (disparadores, auditoría, `TRUNCATE`, concurrencia con dos sesiones y reversión), que sólo se verificaron con los tests automáticos y a través del MCP.
+**No ejecutadas por el autor:** la prueba **27** (concurrencia con dos sesiones `psql`) y la prueba **28** (reversión de la desnormalización). Por lo tanto **sigue sin probarse en vivo** que `FOR SHARE` haga esperar a una transacción concurrente y dé el resultado correcto (baja y reactivación, en ambos órdenes), y la reversión sólo está cubierta por los tests automáticos `test_reversibilidad.sql` y `test_concurrencia.sql` y por la ejecución del agente a través del MCP, no por una corrida manual.
 
 **Defectos reales detectados y corregidos durante esas corridas.** Dos problemas que la verificación automatizada no había mostrado aparecieron al ejecutar a mano:
 
@@ -426,8 +506,8 @@ Pendientes de ejecución manual: las pruebas 20 a 28 (disparadores, auditoría, 
 
 Lo que este trabajo **no** demuestra, o demuestra solo en parte:
 
-- **Cómo se verificaron los scripts.** La verificación automatizada (MCP `postgres`) sólo pudo enviar **una sentencia por llamada**: así se verificó cada sentencia de los dos scripts y se ejecutaron los 14 tests. La ejecución de **ambos archivos completos con `psql -v ON_ERROR_STOP=1 -f`**, su re-ejecución (idempotencia) y la suite 14/14 fueron **verificadas por el autor** (pruebas manuales 1 a 3), y con ellas las pruebas 4 a 19. Siguen sin ejecución manual las pruebas **20 a 28** de `TP4/pruebas_manuales.md`.
-- **Concurrencia real.** El test automático de concurrencia es estructural (comprueba que el `FOR SHARE` está declarado en `fn_vdc_linea` y que `TRUNCATE` está bloqueado). El comportamiento con **dos sesiones simultáneas** (espera y resultado correcto en los escenarios de baja y de reactivación) se razonó a partir de la matriz de bloqueos de PostgreSQL y se describe como prueba manual 27, que **todavía no fue ejecutada** (ni automática ni manualmente). Solo se consideró `READ COMMITTED`; no se probó `SERIALIZABLE`.
+- **Cómo se verificaron los scripts.** La verificación automatizada (MCP `postgres`) sólo pudo enviar **una sentencia por llamada**: así se verificó cada sentencia de los dos scripts y se ejecutaron los 14 tests. La ejecución de **ambos archivos completos con `psql -v ON_ERROR_STOP=1 -f`**, su re-ejecución (idempotencia) y la suite 14/14 fueron **verificadas por el autor** (pruebas manuales 1 a 3), y con ellas las pruebas 4 a 19. El autor ejecutó además las pruebas 20 a 26 (disparadores, auditoría y `TRUNCATE`). Siguen sin ejecución manual las pruebas **27 y 28** de `TP4/pruebas_manuales.md`.
+- **Concurrencia real.** El test automático de concurrencia es estructural (comprueba que el `FOR SHARE` está declarado en `fn_vdc_linea` y que `TRUNCATE` está bloqueado). El comportamiento con **dos sesiones simultáneas** (espera y resultado correcto en los escenarios de baja y de reactivación) se razonó a partir de la matriz de bloqueos de PostgreSQL y se describe como prueba manual 27, que **no fue ejecutada por el autor** (ni automática ni manualmente): el `FOR SHARE` no se probó en vivo con dos sesiones. La prueba 28 (reversión) tampoco se ejecutó a mano; sólo la cubren los tests automáticos y la ejecución del agente vía MCP. Solo se consideró `READ COMMITTED`; no se probó `SERIALIZABLE`.
 - **La garantía de consistencia no es absoluta.** Quedan una **carrera residual** (baja lógica o cambio de fecha de un pedido contra la recategorización simultánea de un producto que lo contiene) y un **caso exótico** (una única sentencia con CTE modificante que cambia `pedido.eliminado` e inserta detalles del mismo pedido). Ambos están documentados con su mitigación, y la auditoría es la red de seguridad; no se resolvieron porque son operaciones administrativas muy infrecuentes.
 - **Mediciones.** Las del agente se hicieron en un único equipo, con caché caliente pero no exacta (las ejecuciones "antes" todavía leyeron ≈ 1 500–2 100 buffers de disco), tres ejecuciones y mediana; las del autor son una sola ejecución por consulta en DBeaver (139,769 ms y 0,112 ms), sin repeticiones. Los tiempos absolutos dependen del equipo; lo que se sostiene es el orden de magnitud y el cambio de plan. **No se midió el sobrecosto en escritura** de los disparadores (alta masiva de detalles con y sin disparadores) ni el costo de recategorizar un producto con mucho historial; solo se describen.
 - **Datos sintéticos.** Los pedidos del día se generan con `generate_series` (distribución casi uniforme, 3 productos por pedido, 10 categorías); no reflejan una distribución de ventas real, y se generan con la fecha de ejecución, por lo que el top 5 y los importes cambian si se regeneran. Re-ejecutar el script 2 **otro día** agrega otro bloque de datos. Además, `test_baja_logica.sql` considera "histórico" lo anterior a `CURRENT_DATE - 1` y deja de pasar desde el segundo día posterior a la generación, y `test_datos_prueba.sql` y `test_ventas_diarias_estructura.sql` necesitan datos del día actual: dependen de la fecha, no de un defecto del código de los scripts.
