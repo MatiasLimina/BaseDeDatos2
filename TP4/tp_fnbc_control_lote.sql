@@ -133,3 +133,64 @@ CREATE TABLE control_lote (
 
 COMMENT ON TABLE responsable_deposito IS 'FNBC: R -> D. Cada responsable de control pertenece a un unico deposito.';
 COMMENT ON TABLE control_lote         IS 'FNBC: que responsable controla cada lote. El deposito se obtiene via responsable_deposito.';
+
+-- =============================================================================
+-- SECCION 3: MIGRACION, VISTA DE COMPATIBILIDAD Y VERIFICACION
+-- =============================================================================
+
+-- Verificacion previa: la migracion solo es segura si la DF R -> D vale en los datos
+-- (un responsable con dos depositos haria ambiguo el SELECT DISTINCT). Debe dar 0 filas.
+SELECT responsable_control_id
+FROM   control_lote_almacen
+GROUP  BY responsable_control_id
+HAVING count(DISTINCT deposito_id) > 1;
+
+-- Migracion: R1 (un hecho por responsable) y luego R2 (un control por lote/responsable).
+-- Orden obligatorio: R2 tiene FK hacia R1.
+INSERT INTO responsable_deposito (responsable_control_id, deposito_id)
+SELECT DISTINCT responsable_control_id, deposito_id
+FROM   control_lote_almacen;
+
+INSERT INTO control_lote (lote_id, responsable_control_id)
+SELECT lote_id, responsable_control_id
+FROM   control_lote_almacen;
+
+-- Vista de compatibilidad: reconstruye la relacion original por NATURAL JOIN. El unico atributo
+-- comun es responsable_control_id, que es CLAVE de responsable_deposito -> reunion sin perdida.
+-- (En produccion se eliminaria control_lote_almacen y la vista tomaria su nombre; aqui se
+--  conserva la tabla original como evidencia para la verificacion EXCEPT.)
+CREATE VIEW v_control_lote_almacen AS
+SELECT lote_id, deposito_id, responsable_control_id
+FROM   control_lote NATURAL JOIN responsable_deposito;
+
+COMMENT ON VIEW v_control_lote_almacen IS
+    'Compatibilidad: reconstruye control_lote_almacen(lote_id, deposito_id, responsable_control_id) por NATURAL JOIN sobre responsable_control_id (union sin perdida).';
+
+-- Verificacion de equivalencia: EXCEPT en ambos sentidos. Ambas consultas deben dar 0 filas.
+SELECT lote_id, deposito_id, responsable_control_id FROM control_lote_almacen
+EXCEPT
+SELECT lote_id, deposito_id, responsable_control_id FROM v_control_lote_almacen;
+
+SELECT lote_id, deposito_id, responsable_control_id FROM v_control_lote_almacen
+EXCEPT
+SELECT lote_id, deposito_id, responsable_control_id FROM control_lote_almacen;
+
+-- Mismo conteo (3 y 3).
+SELECT (SELECT count(*) FROM control_lote_almacen)   AS filas_original,
+       (SELECT count(*) FROM v_control_lote_almacen) AS filas_vista;
+
+-- -----------------------------------------------------------------------------
+-- Demostracion: la DF {Lote, Deposito} -> Responsable NO se preserva.
+-- En el esquema original la PK (lote_id, deposito_id) la imponia. Tras descomponer, ninguna
+-- clave local la impone: un segundo responsable del deposito 30 para el lote 501 es ACEPTADO.
+-- Todo ocurre dentro de una transaccion que se REVIERTE (no queda rastro).
+-- Decision: solo se documenta y demuestra; NO se impone con disparador.
+-- -----------------------------------------------------------------------------
+BEGIN;
+INSERT INTO usuario (id, nombre, apellido) OVERRIDING SYSTEM VALUE
+VALUES (803, 'Responsable', 'Ochocientos Tres');
+INSERT INTO responsable_deposito (responsable_control_id, deposito_id) VALUES (803, 30);
+INSERT INTO control_lote (lote_id, responsable_control_id) VALUES (501, 803);   -- aceptado
+-- La vista muestra DOS responsables para (lote 501, deposito 30):
+SELECT * FROM v_control_lote_almacen WHERE lote_id = 501 ORDER BY responsable_control_id;
+ROLLBACK;
