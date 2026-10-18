@@ -46,21 +46,21 @@
 
 ## 6. Parte 2 – Adaptación del schema y datos de prueba
 
-- [ ] 6.1 RED: escribir `TP4/tests/test_baja_logica.sql` (`pedido.eliminado` y `pedido_detalle.eliminado` existen, `BOOLEAN NOT NULL DEFAULT false`; ningún registro existente con `eliminado` distinto de `FALSE` antes de la carga; asignar `NULL` es rechazado dentro de `ROLLBACK`). Ejecutar → falla por columna inexistente.
-- [ ] 6.2 RED: escribir `TP4/tests/test_dia_negocio.sql` (`fn_dia_negocio('2026-10-18 23:30-03')` = `2026-10-18` con `SET LOCAL TimeZone = 'UTC'` y con `'America/Argentina/Buenos_Aires'`; la función es `IMMUTABLE`). Ejecutar → falla por función inexistente.
-- [ ] 6.3 GREEN: crear `TP4/tp_desnormalizacion_top_categorias.sql` sección 1: `ALTER TABLE ... ADD COLUMN IF NOT EXISTS eliminado BOOLEAN NOT NULL DEFAULT FALSE` en ambas tablas y `fn_dia_negocio` con zona `America/Argentina/Buenos_Aires`. Ejecutar sección + ambos tests → pasan.
-- [ ] 6.4 RED: escribir `TP4/tests/test_datos_prueba.sql` (≥ 8 categorías con ventas no eliminadas en el día de negocio actual; ≥ 100 000 detalles no eliminados de pedidos no eliminados del día; existen pedidos y detalles del día con `eliminado = TRUE`). Ejecutar → falla por aserción (hoy hay 0 pedidos).
-- [ ] 6.5 CHECKPOINT: antes de cargar, exponer al usuario el volumen previsto (≈ 50 000 pedidos / ≥ 150 000 detalles del día), la creación de 7 categorías y la redistribución de productos por `id % 10` en `tp4_foodstore`.
-- [ ] 6.6 GREEN: sección 2 del script (marcada "solo en copia"): categorías con `ON CONFLICT (nombre) DO NOTHING`, redistribución de productos, bloque `DO` con guarda anti-duplicado que genera pedidos y detalles del día con `generate_series` (productos distintos por pedido, `subtotal = cantidad * precio_unitario`, una fracción con `eliminado = TRUE`) y `ANALYZE`. Ejecutar + `test_datos_prueba.sql` → pasa.
-- [ ] 6.7 TRIANGULATE: re-ejecutar la sección 2 y verificar que el conteo de detalles del día no cambia (guarda) y los tests siguen pasando.
-- [ ] 6.8 Documentar en `informe_tp4.md` (intro de Parte 2) las adaptaciones al schema real: `pedido_detalle`, `eliminado`, `TIMESTAMPTZ` vs `= CURRENT_DATE`, zona horaria de negocio, datos generados y fecha de medición.
+- [x] 6.1 RED: escribir `TP4/tests/test_baja_logica.sql` (`pedido.eliminado` y `pedido_detalle.eliminado` existen, `BOOLEAN NOT NULL DEFAULT false`; ningún registro existente con `eliminado` distinto de `FALSE` antes de la carga; asignar `NULL` es rechazado dentro de `ROLLBACK`). Ejecutar → falla por columna inexistente.
+- [x] 6.2 RED: escribir `TP4/tests/test_dia_negocio.sql` (`fn_dia_negocio('2026-10-18 23:30-03')` = `2026-10-18` con `SET LOCAL TimeZone = 'UTC'` y con `'America/Argentina/Buenos_Aires'`; la función es `IMMUTABLE`). Ejecutar → falla por función inexistente.
+- [x] 6.3 GREEN: crear `TP4/tp_desnormalizacion_top_categorias.sql` sección 1: `ALTER TABLE ... ADD COLUMN IF NOT EXISTS eliminado BOOLEAN NOT NULL DEFAULT FALSE` en ambas tablas y `fn_dia_negocio` con zona `America/Argentina/Buenos_Aires`. Ejecutar sección + ambos tests → pasan.
+- [x] 6.4 RED: escribir `TP4/tests/test_datos_prueba.sql` (≥ 8 categorías con ventas no eliminadas en el día de negocio actual; ≥ 100 000 detalles no eliminados de pedidos no eliminados del día; existen pedidos y detalles del día con `eliminado = TRUE`). Ejecutar → falla por aserción (hoy hay 0 pedidos).
+- [x] 6.5 CHECKPOINT: antes de cargar, exponer al usuario el volumen previsto (≈ 50 000 pedidos / ≥ 150 000 detalles del día), la creación de 7 categorías y la redistribución de productos por `id % 10` en `tp4_foodstore`.
+- [x] 6.6 GREEN: sección 2 del script (marcada "solo en copia"): categorías con `ON CONFLICT (nombre) DO NOTHING`, redistribución de productos, bloque `DO` con guarda anti-duplicado que genera pedidos y detalles del día con `generate_series` (productos distintos por pedido, `subtotal = cantidad * precio_unitario`, una fracción con `eliminado = TRUE`) y `ANALYZE`. Ejecutar + `test_datos_prueba.sql` → pasa.
+- [x] 6.7 TRIANGULATE: re-ejecutar la sección 2 y verificar que el conteo de detalles del día no cambia (guarda) y los tests siguen pasando.
+- [x] 6.8 Documentar en `informe_tp4.md` (intro de Parte 2) las adaptaciones al schema real: `pedido_detalle`, `eliminado`, `TIMESTAMPTZ` vs `= CURRENT_DATE`, zona horaria de negocio, datos generados y fecha de medición.
 - Commit sugerido: `feat(tp4): baja lógica eliminado y datos de prueba del día`
 
 ## 7. Parte 2 – Medición baseline (5.2 a)
 
-- [ ] 7.1 Agregar al script la consulta original adaptada (sección 3): `pedido_detalle`, filtro por rango del día de negocio (`fecha >= inicio AND fecha < inicio + 1 día`), `eliminado = FALSE` en pedido y detalle, `GROUP BY c.nombre ORDER BY total_vendido DESC LIMIT 5`. Ejecutarla y verificar que devuelve 5 filas.
-- [ ] 7.2 Ejecutar `EXPLAIN (ANALYZE, BUFFERS)` 3 veces y guardar las salidas completas en `TP4/evidencias/explain_antes.txt`; verificar que el archivo contiene 3 líneas `Execution Time` e identificar el nodo dominante.
-- [ ] 7.3 Documentar en `informe_tp4.md` el punto a): tiempo (mediana), nodo dominante y por qué domina (con extracto del plan).
+- [x] 7.1 Agregar al script la consulta original adaptada (sección 3): `pedido_detalle`, filtro por rango del día de negocio (`fecha >= inicio AND fecha < inicio + 1 día`), `eliminado = FALSE` en pedido y detalle, `GROUP BY c.nombre ORDER BY total_vendido DESC LIMIT 5`. Ejecutarla y verificar que devuelve 5 filas.
+- [x] 7.2 Ejecutar `EXPLAIN (ANALYZE, BUFFERS)` 3 veces y guardar las salidas completas en `TP4/evidencias/explain_antes.txt`; verificar que el archivo contiene 3 líneas `Execution Time` e identificar el nodo dominante.
+- [x] 7.3 Documentar en `informe_tp4.md` el punto a): tiempo (mediana), nodo dominante y por qué domina (con extracto del plan).
 - Commit sugerido: `test(tp4): medición baseline de la consulta top 5 normalizada`
 
 ## 8. Parte 2 – Estructura desnormalizada y disparadores (5.2 b, c)

@@ -103,3 +103,25 @@ ANALYZE categoria;
 ANALYZE producto;
 ANALYZE pedido;
 ANALYZE pedido_detalle;
+
+-- =============================================================================
+-- SECCION 3: CONSULTA ORIGINAL (BASELINE, NORMALIZADA)
+-- Consigna: top 5 de categorias por monto vendido "hoy". Adaptada al schema real:
+--   * detalle_pedido -> pedido_detalle
+--   * ped.fecha = CURRENT_DATE -> rango [inicio del dia de negocio, +1 dia): pedido.fecha es
+--     TIMESTAMPTZ; el rango es sargable sobre idx_pedido_fecha.
+--   * baja logica en pedido y detalle; desempate por nombre para que el top 5 sea determinista.
+-- Medicion: ejecutar con EXPLAIN (ANALYZE, BUFFERS) 3 veces (ver TP4/evidencias/explain_antes.txt).
+-- =============================================================================
+SELECT c.nombre AS categoria, SUM(dp.subtotal) AS total_vendido
+FROM   pedido_detalle dp
+JOIN   pedido    ped ON ped.id = dp.pedido_id
+JOIN   producto  pr  ON pr.id  = dp.producto_id
+JOIN   categoria c   ON c.id   = pr.categoria_id
+WHERE  ped.fecha >= (fn_dia_negocio(now())::timestamp AT TIME ZONE 'America/Argentina/Buenos_Aires')
+  AND  ped.fecha <  (fn_dia_negocio(now())::timestamp AT TIME ZONE 'America/Argentina/Buenos_Aires') + INTERVAL '1 day'
+  AND  ped.eliminado = FALSE
+  AND  dp.eliminado  = FALSE
+GROUP  BY c.nombre
+ORDER  BY total_vendido DESC, c.nombre
+LIMIT  5;

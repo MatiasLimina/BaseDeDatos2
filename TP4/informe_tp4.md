@@ -126,3 +126,22 @@ La consigna asume un schema que la base `tp4_foodstore` (clon de `food_store_cop
 | Desempate del top 5 | `ORDER BY total_vendido DESC` no es determinista ante empates; se agrega `nombre` como segundo criterio en la consulta normalizada y en la desnormalizada. | secciones 3 y 5 |
 
 Fecha de las mediciones: **2026-10-18** (los datos del día se generan en función de la fecha de ejecución).
+
+## a) Medición baseline de la consulta normalizada
+
+Consulta (sección 3 del script; devuelve 5 filas: Lácteos 190 001 983,35; Congelados 188 996 044,10; Golosinas 151 840 063,72; Panadería 150 872 583,56; Carnes 122 887 183,95):
+
+```sql
+SELECT c.nombre AS categoria, SUM(dp.subtotal) AS total_vendido
+FROM   pedido_detalle dp
+JOIN   pedido ped ON ped.id = dp.pedido_id
+JOIN   producto pr ON pr.id = dp.producto_id
+JOIN   categoria c ON c.id = pr.categoria_id
+WHERE  ped.fecha >= <inicio del día de negocio> AND ped.fecha < <inicio> + INTERVAL '1 day'
+  AND  ped.eliminado = FALSE AND dp.eliminado = FALSE
+GROUP  BY c.nombre ORDER BY total_vendido DESC, c.nombre LIMIT 5;
+```
+
+`EXPLAIN (ANALYZE, BUFFERS)` ejecutado tres veces consecutivas (caché caliente; salidas completas en `TP4/evidencias/explain_antes.txt`): **141,857 ms / 138,899 ms / 142,337 ms → mediana 141,857 ms** (≈ 9 000–9 500 buffers en caché y ≈ 1 500–2 100 leídos por ejecución).
+
+**Nodo dominante.** El costo lo concentra la cadena de `Hash Join` que arranca en un `Parallel Seq Scan on pedido_detalle` (≈ 33 ms por proceso, 255 067 filas por proceso, el 100 % de las ~771 000 filas de la tabla): `pedido_detalle` no tiene fecha, por lo que el filtro del día sólo puede aplicarse *después* de unir con `pedido` (el `Bitmap Index Scan` sobre `idx_pedido_fecha` resuelve bien las 50 000 filas del día en ≈ 2 ms, pero no evita recorrer todos los detalles). A eso se suma un `Seq Scan` completo de `producto` (50 005 filas, hash) en cada uno de los 3 procesos. Entre los Hash Join y el agregado parcial se procesan ≈ 137 000 filas (3 × 45 667) para producir sólo 10 grupos: el trabajo es proporcional al volumen de ventas del día, no al número de categorías, y se repite íntegro cada vez que se abre el panel.
