@@ -22,8 +22,8 @@
 
 ## 3. Parte 1 – Análisis de dependencias funcionales (documentación)
 
-- [ ] 3.1 Agregar al script una consulta de evidencia de la DF `Responsable → Depósito` sobre la instancia (`GROUP BY responsable_control_id HAVING count(DISTINCT deposito_id) > 1` → 0 filas) y ejecutarla; verificar 0 filas.
-- [ ] 3.2 Crear `TP4/informe_tp4.md` con la sección Parte 1 a)–d): DFs en notación formal; tabla de clausuras de `{L}`, `{D}`, `{R}`, `{L,D}`, `{L,R}`, `{D,R}`; claves candidatas `{L,D}` y `{L,R}`; atributos primos (los tres); 3FN sí / FNBC no con la DF violatoria `R → D` y `R⁺ = {R, D}` ≠ esquema; un párrafo por anomalía (inserción, borrado, actualización) sobre 501/502/503, 30/31, 801/802. Verificar contra los escenarios de `specs/control-lote-almacen/spec.md` (requisito "Análisis formal...").
+- [x] 3.1 Agregar al script una consulta de evidencia de la DF `Responsable → Depósito` sobre la instancia (`GROUP BY responsable_control_id HAVING count(DISTINCT deposito_id) > 1` → 0 filas) y ejecutarla; verificar 0 filas.
+- [x] 3.2 Crear `TP4/informe_tp4.md` con la sección Parte 1 a)–d): DFs en notación formal; tabla de clausuras de `{L}`, `{D}`, `{R}`, `{L,D}`, `{L,R}`, `{D,R}`; claves candidatas `{L,D}` y `{L,R}`; atributos primos (los tres); 3FN sí / FNBC no con la DF violatoria `R → D` y `R⁺ = {R, D}` ≠ esquema; un párrafo por anomalía (inserción, borrado, actualización) sobre 501/502/503, 30/31, 801/802. Verificar contra los escenarios de `specs/control-lote-almacen/spec.md` (requisito "Análisis formal...").
 - Commit sugerido: `docs(tp4): análisis de dependencias funcionales y violación de FNBC`
 
 ## 4. Parte 1 – Descomposición en FNBC

@@ -86,3 +86,15 @@ INSERT INTO control_lote_almacen (lote_id, deposito_id, responsable_control_id)
 VALUES (501, 30, 801),
        (502, 30, 801),
        (503, 31, 802);
+
+-- -----------------------------------------------------------------------------
+-- Evidencia de la DF  ResponsableControlID -> DepositoID  sobre la instancia.
+-- Si la DF vale, ningun responsable aparece asociado a mas de un deposito:
+-- la consulta debe devolver 0 filas.
+-- (Una instancia no PRUEBA una DF; solo es coherente con ella. La DF proviene
+--  de la regla de negocio: cada responsable pertenece a un unico deposito.)
+-- -----------------------------------------------------------------------------
+SELECT responsable_control_id
+FROM   control_lote_almacen
+GROUP  BY responsable_control_id
+HAVING count(DISTINCT deposito_id) > 1;
