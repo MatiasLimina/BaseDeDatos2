@@ -80,7 +80,7 @@ Guía para verificar a mano, sobre la base `tp4_foodstore`, todo lo que implemen
   - Las consultas de verificación de la DF y los dos `EXCEPT` devuelven `(0 rows)`.
   - El conteo devuelve `filas_original = 3`, `filas_vista = 3`.
   - La demostración final (en `BEGIN ... ROLLBACK`) devuelve 2 filas: `501 | 30 | 801` y `501 | 30 | 900803`.
-- [ ] Aprobada (1.ª ejecución)  [ ] Aprobada (2.ª ejecución)
+- [x] Aprobada (1.ª ejecución)  [x] Aprobada (2.ª ejecución)
 
 ### Prueba 2 – Script de la Parte 2 (desnormalización): carga y re-ejecución
 
@@ -100,7 +100,7 @@ Guía para verificar a mano, sobre la base `tp4_foodstore`, todo lo que implemen
   - La consulta baseline (sección 3) y la consulta desnormalizada (sección 5) devuelven las **mismas 5 filas**: `Lácteos 190001983.35`, `Congelados 188996044.10`, `Golosinas 151840063.72`, `Panadería 150872583.56`, `Carnes 122887183.95` (valores de los datos del 2026-10-18).
   - La auditoría de la sección 6 devuelve `(0 rows)`.
   - **Advertencia:** correr este script **otro día** agrega otros ~50 000 pedidos y ~150 000 detalles (la guarda solo mira "hoy").
-- [ ] Aprobada (1.ª ejecución)  [ ] Aprobada (2.ª ejecución)
+- [x] Aprobada (1.ª ejecución)  [x] Aprobada (2.ª ejecución)
 
 ### Prueba 3 – Suite de tests automáticos (14 archivos)
 
@@ -125,8 +125,8 @@ Guía para verificar a mano, sobre la base `tp4_foodstore`, todo lo que implemen
   ```
 
 - **Resultado esperado:** los 14 archivos terminan sin `ERROR` y sin la línea `FALLO:`. Cada uno imprime `DO` (y algunos `NOTICE: OK test_...`); los dos de disparadores muestran además `CREATE FUNCTION` y `DROP FUNCTION` de los ayudantes `t4_vdc_*`.
-- **Limitación conocida (dependen del día):** `test_baja_logica.sql` considera "histórico" todo pedido con fecha anterior a `CURRENT_DATE - 1` y exige que ninguno esté eliminado, por lo que pasa el día en que se generaron los datos y el siguiente, y **falla desde el segundo día posterior** (porque los pedidos de prueba eliminados ya son "históricos"). `test_datos_prueba.sql` y `test_ventas_diarias_estructura.sql` necesitan datos del **día actual** (>= 100 000 detalles vigentes, 10 filas de hoy). No son fallas de los scripts.
-- [ ] Aprobada (anotá cuántos archivos pasaron: ____ / 14)
+- **Limitación conocida (dependen del día):** `test_baja_logica.sql` ya no depende del día (corregido en `0247b22`). `test_datos_prueba.sql` y `test_ventas_diarias_estructura.sql` siguen necesitando datos del **día actual** (>= 100 000 detalles vigentes, 10 filas de hoy). No son fallas de los scripts.
+- [x] Aprobada (14 / 14 archivos pasaron tras el fix de `test_concurrencia`, commit `46d3da5`)
 
 ---
 
@@ -142,7 +142,7 @@ Guía para verificar a mano, sobre la base `tp4_foodstore`, todo lo que implemen
   ```
 
 - **Resultado esperado:** 3 filas: `501 | 30 | 801`, `502 | 30 | 801`, `503 | 31 | 802`.
-- [ ] Aprobada
+- [x] Aprobada
 
 ### Prueba 5 – La PK y las FK del esquema original rechazan datos inválidos
 
@@ -163,7 +163,7 @@ Guía para verificar a mano, sobre la base `tp4_foodstore`, todo lo que implemen
   - 1.º: `ERROR: ... unique constraint "pk_control_lote_almacen"` (en un servidor en español: "llave duplicada viola restricción de unicidad").
   - 2.º: `ERROR: ... foreign key constraint "fk_cla_lote"`.
   - El texto exacto depende del idioma del servidor; lo que se verifica es el **nombre de la restricción**.
-- [ ] Aprobada
+- [x] Aprobada
 
 ### Prueba 6 – Violación de FNBC: la DF `R → D` con `R` no superclave
 
@@ -185,7 +185,7 @@ Guía para verificar a mano, sobre la base `tp4_foodstore`, todo lo que implemen
   ```
 
 - **Resultado esperado:** (a) `801 | 1` y `802 | 1`; (b) una fila: `801 | 2`; (c) `PRIMARY KEY (lote_id, deposito_id)`. Conclusión: `R → D` vale, `R` se repite (no es superclave) y por lo tanto el determinante de una DF no trivial no es superclave: viola FNBC.
-- [ ] Aprobada
+- [x] Aprobada
 
 ### Prueba 7 – Anomalía de inserción (original) y su solución (descompuesto)
 
@@ -218,7 +218,7 @@ Guía para verificar a mano, sobre la base `tp4_foodstore`, todo lo que implemen
   ```
 
 - **Resultado esperado:** (a) `ERROR: null value in column "lote_id" ... violates not-null constraint`; (b) `INSERT 0 1` y la consulta devuelve `801 | 2` (la contradicción entró sin error); (c) `INSERT 0 1` y devuelve la fila `900803 | 30`; (d) `ERROR: ... unique constraint "pk_responsable_deposito"`.
-- [ ] Aprobada
+- [x] Aprobada
 
 ### Prueba 8 – Anomalía de borrado
 
@@ -238,7 +238,7 @@ Guía para verificar a mano, sobre la base `tp4_foodstore`, todo lo que implemen
   ```
 
 - **Resultado esperado:** primero `0` (el dato "802 → depósito 31" se perdió); después `31` (se conserva).
-- [ ] Aprobada
+- [x] Aprobada
 
 ### Prueba 9 – Anomalía de actualización
 
@@ -260,7 +260,7 @@ Guía para verificar a mano, sobre la base `tp4_foodstore`, todo lo que implemen
   ```
 
 - **Resultado esperado:** 1.º: `UPDATE 1` y la consulta devuelve `801 | 2` (inconsistente: 801 aparece en dos depósitos). 2.º: `UPDATE 1` (una sola fila) y la vista devuelve `501 | 31 | 801` y `502 | 31 | 801` (los dos lotes siguen al responsable).
-- [ ] Aprobada
+- [x] Aprobada
 
 ### Prueba 10 – Descomposición: estructura y rechazos
 
@@ -282,7 +282,7 @@ Guía para verificar a mano, sobre la base `tp4_foodstore`, todo lo que implemen
   - La consulta devuelve 6 filas: `control_lote`: `pk_control_lote PRIMARY KEY (lote_id, responsable_control_id)`, `fk_cl_lote` y `fk_cl_responsable` (esta apunta a `responsable_deposito(responsable_control_id)`); `responsable_deposito`: `pk_responsable_deposito PRIMARY KEY (responsable_control_id)`, `fk_rd_deposito`, `fk_rd_responsable`. Todas las FK terminan en `ON DELETE RESTRICT`.
   - `INSERT` de un responsable inexistente: `ERROR: ... foreign key constraint "fk_cl_responsable"`.
   - `DELETE` del depósito 30 y del lote 501: `ERROR: update or delete on table ... violates RESTRICT setting of foreign key constraint ...` (el nombre que menciona puede ser `fk_cla_deposito`/`fk_cla_lote`, de la tabla original que sigue existiendo, o `fk_rd_deposito`/`fk_cl_lote`: PostgreSQL informa la primera que evalúa; lo que importa es que se rechaza).
-- [ ] Aprobada
+- [x] Aprobada
 
 ### Prueba 11 – Migración y vista de compatibilidad (`EXCEPT` en ambos sentidos y conteos)
 
@@ -307,7 +307,7 @@ Guía para verificar a mano, sobre la base `tp4_foodstore`, todo lo que implemen
   ```
 
 - **Resultado esperado:** los dos `EXCEPT` devuelven `(0 rows)`; el conteo devuelve `3 | 3 | 2 | 3`; la vista devuelve `501 | 30 | 801`, `502 | 30 | 801`, `503 | 31 | 802`.
-- [ ] Aprobada
+- [x] Aprobada
 
 ### Prueba 12 – La dependencia `{Lote, Depósito} → Responsable` no se preserva
 
@@ -326,7 +326,7 @@ Guía para verificar a mano, sobre la base `tp4_foodstore`, todo lo que implemen
   ```
 
 - **Resultado esperado:** el 3.º `INSERT` termina en `INSERT 0 1`; la vista devuelve dos filas: `501 | 30 | 801` y `501 | 30 | 900803`; el último `INSERT` (tabla original) falla con `ERROR: ... unique constraint "pk_control_lote_almacen"`.
-- [ ] Aprobada
+- [x] Aprobada
 
 ---
 
@@ -351,7 +351,7 @@ Guía para verificar a mano, sobre la base `tp4_foodstore`, todo lo que implemen
   ```
 
 - **Resultado esperado:** la consulta devuelve 2 filas (`pedido` y `pedido_detalle`): `boolean | NO | false`. El `INSERT ... RETURNING` devuelve `eliminado = f`. El `UPDATE ... = NULL` falla con `ERROR: null value in column "eliminado" ... violates not-null constraint`.
-- [ ] Aprobada
+- [x] Aprobada
 
 ### Prueba 14 – Día de negocio independiente de la zona horaria de la sesión
 
@@ -371,7 +371,7 @@ Guía para verificar a mano, sobre la base `tp4_foodstore`, todo lo que implemen
   ```
 
 - **Resultado esperado:** `con_sesion_utc = 2026-10-18` y `sin_la_funcion = 2026-10-19` (por eso hace falta la función: a las 23:30 de Buenos Aires ya es el día siguiente en UTC); `con_sesion_ba = 2026-10-18`; `provolatile = i` (immutable).
-- [ ] Aprobada
+- [x] Aprobada. Nota del autor: en la ejecución aparecieron 12 categorías (no 10) por el bug de codificación de `psql` en Windows, ya corregido en `7417b2d` (`SET client_encoding = 'UTF8'` en el script); el resultado válido es `categorias >= 8`.
 
 ### Prueba 15 – Datos de prueba del día
 
@@ -390,7 +390,7 @@ Guía para verificar a mano, sobre la base `tp4_foodstore`, todo lo que implemen
   ```
 
 - **Resultado esperado** (base del autor): `10 | 50000 | 2500 | 137000 | 6000`. Criterio de aprobación: `categorias >= 8`, `detalles_vigentes >= 100000`, `pedidos_eliminados > 0` y `detalles_eliminados > 0`.
-- [ ] Aprobada
+- [x] Aprobada
 
 ### Prueba 16 – Estructura de `ventas_diarias_categoria` y consistencia de la carga inicial
 
@@ -416,7 +416,7 @@ Guía para verificar a mano, sobre la base `tp4_foodstore`, todo lo que implemen
   ```
 
 - **Resultado esperado:** la 1.ª consulta devuelve 4 filas: `pk_ventas_diarias_categoria PRIMARY KEY (fecha, categoria_id)`, `fk_vdc_categoria ... REFERENCES categoria(id) ON DELETE RESTRICT`, `chk_vdc_lineas_no_negativo CHECK ((cantidad_lineas >= 0))` y `chk_vdc_total_no_negativo CHECK ((total_vendido >= (0)::numeric))`. La 2.ª devuelve dos números **iguales** (`1756 | 1756` en la base del autor). El `UPDATE` falla con `ERROR: ... violates check constraint "chk_vdc_total_no_negativo"`.
-- [ ] Aprobada
+- [x] Aprobada
 
 ---
 
@@ -465,7 +465,7 @@ Guía para verificar a mano, sobre la base `tp4_foodstore`, todo lo que implemen
   ```
 
 - **Resultado esperado:** (a) y (b) devuelven las mismas 5 filas en el mismo orden: `Lácteos 190001983.35`, `Congelados 188996044.10`, `Golosinas 151840063.72`, `Panadería 150872583.56`, `Carnes 122887183.95` (datos del 2026-10-18); (c) las dos consultas `EXCEPT` devuelven `(0 rows)`. Nota: `Perfumería 122872504.68` queda 6.ª por solo 14 678,67 de diferencia con `Carnes`.
-- [ ] Aprobada
+- [x] Aprobada
 
 ### Prueba 18 – `EXPLAIN (ANALYZE, BUFFERS)` ANTES (consulta normalizada)
 
@@ -486,7 +486,7 @@ Guía para verificar a mano, sobre la base `tp4_foodstore`, todo lo que implemen
   ```
 
 - **Resultado esperado:** el plan incluye `Parallel Seq Scan on pedido_detalle dp` (recorre toda la tabla, ~771 000 filas), `Hash Join` con un `Seq Scan` de `producto` y `Bitmap Index Scan on idx_pedido_fecha` para `pedido`; `Execution Time` de referencia **~140 ms** (el autor midió 141,857 / 138,899 / 142,337 ms) y del orden de 11 000 buffers. **Los tiempos dependen del equipo, del caché y de la carga**: en otra máquina pueden ser distintos. Criterio de aprobación: el nodo dominante es el `Seq Scan` de `pedido_detalle` y el tiempo es del orden de decenas a pocos cientos de ms.
-- [ ] Aprobada   Tiempos obtenidos: ______ / ______ / ______ ms
+- [x] Aprobada   Tiempos obtenidos (autor, DBeaver, 1 ejecución): 139,769 ms (11 077 buffers)
 
 ### Prueba 19 – `EXPLAIN (ANALYZE, BUFFERS)` DESPUÉS (consulta desnormalizada)
 
@@ -504,7 +504,7 @@ Guía para verificar a mano, sobre la base `tp4_foodstore`, todo lo que implemen
   ```
 
 - **Resultado esperado:** el plan usa `Bitmap Index Scan on pk_ventas_diarias_categoria` (o `Index Scan`) y devuelve 10 filas antes del `LIMIT`; `Buffers: shared hit=13`; `Execution Time` de referencia **~0,1 ms** (el autor midió 0,104 / 0,100 / 0,101 ms; una medición posterior dio 0,118 ms). **Depende del equipo**. Criterio de aprobación: no hay `Seq Scan` de `pedido_detalle`, el tiempo es menor que ~1 ms y es **al menos ~100 veces menor** que el de la prueba 18.
-- [ ] Aprobada   Tiempos obtenidos: ______ / ______ / ______ ms
+- [x] Aprobada   Tiempos obtenidos (autor, DBeaver, 1 ejecución): 0,112 ms (12 buffers)
 
 ---
 
@@ -566,7 +566,7 @@ Todas estas pruebas usan los ayudantes del prerrequisito 5 y terminan en `ROLLBA
   5. una fila: `hoy | 2 | 250.00 | 1` (la reactivación la devuelve)
   6. `(0 rows)`
   7. `filas_auditoria = 0`
-- [ ] Aprobada
+- [x] Aprobada
 
 ### Prueba 21 – Disparador de `pedido`: baja lógica, reactivación y cambio de fecha
 
@@ -608,7 +608,7 @@ Todas estas pruebas usan los ayudantes del prerrequisito 5 y terminan en `ROLLBA
   3. las mismas dos filas del paso 1
   4. dos filas con la fecha de **ayer** (`hoy - 1`): `ayer | 1 | 100.00 | 1` y `ayer | 2 | 50.00 | 1` (las filas de "hoy" desaparecen del delta: volvieron a su valor original)
   5. `filas_auditoria = 0`
-- [ ] Aprobada
+- [x] Aprobada
 
 ### Prueba 22 – Disparador de `producto`: recategorización con ventas en varios días
 
@@ -635,7 +635,7 @@ Todas estas pruebas usan los ayudantes del prerrequisito 5 y terminan en `ROLLBA
   ```
 
 - **Resultado esperado** (base del autor): la 1.ª consulta devuelve `22349.10 | 8 | 6`. Luego `UPDATE 1` y el resumen devuelve dos filas: `1 | -22349.10 | -8 | 6` y `3 | 22349.10 | 8 | 6` (lo que pierde la categoría 1 lo gana la 3, en los mismos 6 días). `filas_auditoria = 0`. En otra base, los números de la 1.ª consulta son los que deben aparecer (con signo opuesto en la categoría de origen).
-- [ ] Aprobada
+- [x] Aprobada. Valores observados por el autor: 1.ª consulta `22349,10 | 8 | 6`; resumen `1 | -22349,10 | -8 | 6` y `3 | 22349,10 | 8 | 6`; `filas_auditoria = 0`.
 
 ---
 
@@ -651,7 +651,7 @@ Todas estas pruebas usan los ayudantes del prerrequisito 5 y terminan en `ROLLBA
   ```
 
 - **Resultado esperado:** `(0 rows)` (recorre todo el histórico; tarda un par de segundos).
-- [ ] Aprobada
+- [x] Aprobada
 
 ### Prueba 24 – La auditoría detecta una alteración manual
 
@@ -677,7 +677,7 @@ Todas estas pruebas usan los ayudantes del prerrequisito 5 y terminan en `ROLLBA
   - (a) una fila: `hoy | 1 | 83107897.56 | 83107898.56 | 15000 | 15000` (`total_tabla = total_fuente + 1.00`);
   - (b) dos filas: la anterior y `hoy | 2 | 30069120.34 | NULL | 11001 | NULL` (la fila falta en la tabla);
   - tras el `ROLLBACK`: `filas_auditoria_tras_rollback = 0`.
-- [ ] Aprobada
+- [x] Aprobada
 
 ### Prueba 25 – Auditoría vacía después de todas las pruebas
 
@@ -691,7 +691,7 @@ Todas estas pruebas usan los ayudantes del prerrequisito 5 y terminan en `ROLLBA
   ```
 
 - **Resultado esperado:** `(0 rows)`; y `filas_vdc` igual al de antes de empezar (`1756` en la base del autor) con `disparadores = 5`. Si hiciste la prueba 27 (que sí confirma cambios), esta consulta es la que confirma que su limpieza quedó bien.
-- [ ] Aprobada
+- [x] Aprobada
 
 ---
 
@@ -715,7 +715,7 @@ Todas estas pruebas usan los ayudantes del prerrequisito 5 y terminan en `ROLLBA
   ```
 
 - **Resultado esperado:** ambos `TRUNCATE` fallan con `ERROR: TRUNCATE de pedido_detalle no permitido: ventas_diarias_categoria no se puede sincronizar con TRUNCATE; use DELETE o reconstruya los totales (ver seccion 4 del script)` (el segundo menciona `pedido`); `SQLSTATE 0A000`. Los conteos siguen igual (`771201 | 250002` en la base del autor).
-- [ ] Aprobada
+- [x] Aprobada
 
 ### Prueba 27 – Concurrencia con DOS sesiones: `FOR SHARE` hace esperar
 
@@ -805,6 +805,7 @@ SELECT * FROM v_auditoria_ventas_diarias;                                     --
 - **Criterio de aprobación:** en las variantes 1 y 2 (baja) y 3 y 4 (reactivación) se **observa la espera** (pasos 4/5 de la variante 1, paso 2 de la 2, paso 2 de la 3 y paso 2 de la 4) y la auditoría final y tras la limpieza devuelve `(0 rows)`. Si en la variante 1 la sesión B **no** espera (devuelve `UPDATE 1` al instante), el `FOR SHARE` no está actuando: la prueba falla.
 - **Nota:** esta prueba no pudo ejecutarse de forma automática (requiere dos sesiones). Su resultado esperado sale del mecanismo documentado en el informe (punto c) y en el script (sección 4): `FOR SHARE` conflictúa con `FOR NO KEY UPDATE`, que es el bloqueo del `UPDATE` de `pedido.eliminado`. El test automático `test_concurrencia.sql` solo verifica que el bloqueo está declarado en `fn_vdc_linea` (y que no se filtra por `eliminado` en el `WHERE`). Las variantes 3 y 4 cubren el caso de la reactivación concurrente, que con el bloqueo condicionado a `NOT p.eliminado` perdía la línea.
 - [ ] Aprobada (variante 1)  [ ] Aprobada (variante 2)  [ ] Aprobada (variante 3)  [ ] Aprobada (variante 4)  [ ] Limpieza hecha y auditoría vacía
+- **Estado: no ejecutada por el autor.**
 
 ### Prueba 28 – Reversión de la desnormalización
 
@@ -845,6 +846,7 @@ SELECT * FROM v_auditoria_ventas_diarias;                                     --
 
 - **Resultado esperado:** dentro de la transacción: `disparadores = 0`, `tabla` vacío (`NULL`), `detalles = 771201` (la fuente intacta) y el top 5 normalizado con las mismas 5 filas de la prueba 17. Tras el `ROLLBACK`: `disparadores = 5` y `filas_vdc = 1756`.
 - [ ] Aprobada
+- **Estado: no ejecutada por el autor.**
 
 ---
 
@@ -852,14 +854,14 @@ SELECT * FROM v_auditoria_ventas_diarias;                                     --
 
 | Grupo | Pruebas | Aprobadas |
 |-------|---------|-----------|
-| A. Carga y tests automáticos | 1, 2, 3 | [ ] 1  [ ] 2  [ ] 3 |
-| B. Parte 1 – FNBC | 4 a 12 | [ ] 4  [ ] 5  [ ] 6  [ ] 7  [ ] 8  [ ] 9  [ ] 10  [ ] 11  [ ] 12 |
-| C. Parte 2 – base | 13 a 16 | [ ] 13  [ ] 14  [ ] 15  [ ] 16 |
-| D. Top 5 y medición | 17, 18, 19 | [ ] 17  [ ] 18  [ ] 19 |
-| E. Disparadores | 20, 21, 22 | [ ] 20  [ ] 21  [ ] 22 |
-| F. Auditoría | 23, 24, 25 | [ ] 23  [ ] 24  [ ] 25 |
-| G. TRUNCATE, concurrencia, reversión | 26, 27, 28 | [ ] 26  [ ] 27  [ ] 28 |
+| A. Carga y tests automáticos | 1, 2, 3 | [x] 1  [x] 2  [x] 3 |
+| B. Parte 1 – FNBC | 4 a 12 | [x] 4  [x] 5  [x] 6  [x] 7  [x] 8  [x] 9  [x] 10  [x] 11  [x] 12 |
+| C. Parte 2 – base | 13 a 16 | [x] 13  [x] 14  [x] 15  [x] 16 |
+| D. Top 5 y medición | 17, 18, 19 | [x] 17  [x] 18  [x] 19 |
+| E. Disparadores | 20, 21, 22 | [x] 20  [x] 21  [x] 22 |
+| F. Auditoría | 23, 24, 25 | [x] 23  [x] 24  [x] 25 |
+| G. TRUNCATE, concurrencia, reversión | 26, 27, 28 | [x] 26  [ ] 27  [ ] 28 (27 y 28 no ejecutadas por el autor) |
 
-- [ ] **Todas las pruebas (28) aprobadas.**
-- Ejecutado por: ______________________   Fecha: ______________   Equipo / PostgreSQL: ______________________
-- Observaciones (pruebas que fallaron y por qué): ______________________________________________
+- [ ] **Todas las pruebas (28) aprobadas.** Estado: **26 de 28 aprobadas** (1 a 26). Las pruebas 27 (concurrencia con dos sesiones) y 28 (reversión) **no fueron ejecutadas por el autor**; la 28 sólo está cubierta por los tests automáticos (`test_reversibilidad`, `test_concurrencia`) y por la ejecución del agente vía MCP, y el `FOR SHARE` de la 27 no se probó en vivo.
+- Ejecutado por: Matías Limina   Fecha: 2026-10-18   Equipo / PostgreSQL: equipo del autor / PostgreSQL 18.6
+- Observaciones (pruebas que fallaron y por qué): ninguna falló en la versión final. Durante las corridas se detectaron y corrigieron dos defectos reales: falso positivo de `test_concurrencia` por comentarios (`46d3da5`) y categorías duplicadas por la codificación de `psql` en Windows (`7417b2d`).
