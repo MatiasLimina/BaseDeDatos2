@@ -9,15 +9,15 @@
 
 ## 1. Preparación del entorno
 
-- [ ] 1.1 Verificar que el MCP apunta a la base correcta: `SELECT current_database()` devuelve `tp4_foodstore`; si no, detener y avisar.
-- [ ] 1.2 Crear las carpetas `TP4/tests/` y `TP4/evidencias/`; verificar que existen.
+- [x] 1.1 Verificar que el MCP apunta a la base correcta: `SELECT current_database()` devuelve `tp4_foodstore`; si no, detener y avisar.
+- [x] 1.2 Crear las carpetas `TP4/tests/` y `TP4/evidencias/`; verificar que existen.
 
 ## 2. Parte 1 – Esquema original e instancia de ejemplo
 
-- [ ] 2.1 RED: escribir `TP4/tests/test_fnbc_esquema_original.sql` (tabla `control_lote_almacen` con exactamente las filas `(501,30,801)`, `(502,30,801)`, `(503,31,802)`; PK rechaza `(501,30,802)`; FK rechaza un `lote_id` inexistente). Ejecutarlo y verificar que falla con "relation ... does not exist".
-- [ ] 2.2 GREEN: crear `TP4/tp_fnbc_control_lote.sql` sección 1: encabezado estilo `schema.sql`, `DROP ... IF EXISTS ... CASCADE` de los objetos propios, tablas mínimas `lote`, `deposito`, `usuario` (`BIGINT GENERATED ALWAYS AS IDENTITY`, inserción con `OVERRIDING SYSTEM VALUE` + `setval`), tabla `control_lote_almacen` tal como la consigna e instancia de ejemplo. Ejecutar script + test → pasa.
-- [ ] 2.3 TRIANGULATE: ejecutar el script dos veces seguidas y luego el test; verificar que ambas ejecuciones terminan sin error y el test sigue pasando (idempotencia).
-- [ ] 2.4 REFACTOR: comentarios que justifiquen cada `NOT NULL`, FK y `ON DELETE RESTRICT`; re-ejecutar script + test → pasa.
+- [x] 2.1 RED: escribir `TP4/tests/test_fnbc_esquema_original.sql` (tabla `control_lote_almacen` con exactamente las filas `(501,30,801)`, `(502,30,801)`, `(503,31,802)`; PK rechaza `(501,30,802)`; FK rechaza un `lote_id` inexistente). Ejecutarlo y verificar que falla con "relation ... does not exist".
+- [x] 2.2 GREEN: crear `TP4/tp_fnbc_control_lote.sql` sección 1: encabezado estilo `schema.sql`, `DROP ... IF EXISTS ... CASCADE` de los objetos propios, tablas mínimas `lote`, `deposito`, `usuario` (`BIGINT GENERATED ALWAYS AS IDENTITY`, inserción con `OVERRIDING SYSTEM VALUE` + `setval`), tabla `control_lote_almacen` tal como la consigna e instancia de ejemplo. Ejecutar script + test → pasa.
+- [x] 2.3 TRIANGULATE: ejecutar el script dos veces seguidas y luego el test; verificar que ambas ejecuciones terminan sin error y el test sigue pasando (idempotencia).
+- [x] 2.4 REFACTOR: comentarios que justifiquen cada `NOT NULL`, FK y `ON DELETE RESTRICT`; re-ejecutar script + test → pasa.
 - Commit sugerido: `feat(tp4): esquema original control_lote_almacen con instancia de ejemplo`
 
 ## 3. Parte 1 – Análisis de dependencias funcionales (documentación)
