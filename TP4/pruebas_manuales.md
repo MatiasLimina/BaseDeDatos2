@@ -758,17 +758,53 @@ Todas estas pruebas usan los ayudantes del prerrequisito 5 y terminan en `ROLLBA
 | 5 | A | `COMMIT;` | `COMMIT` |
 | 6 | cualquiera | `SELECT * FROM v_auditoria_ventas_diarias;` | `(0 rows)` |
 
+**Variante 3 – REACTIVACIÓN: primero `UPDATE eliminado = FALSE` (A), después un detalle (B).** Antes, en ambas sesiones, elegí un pedido de hoy **eliminado** sin el producto 10:
+
+```sql
+SELECT min(p.id) AS pid2 FROM pedido p
+WHERE  p.fecha >= (fn_dia_negocio(now())::timestamp AT TIME ZONE 'America/Argentina/Buenos_Aires')
+  AND  p.eliminado
+  AND  NOT EXISTS (SELECT 1 FROM pedido_detalle d WHERE d.pedido_id = p.id AND d.producto_id = 10)
+\gset
+\echo pedido eliminado elegido: :pid2
+```
+
+| Paso | Sesión | Comando | Resultado esperado |
+|------|--------|---------|--------------------|
+| 1 | A | `BEGIN;` y `UPDATE pedido SET eliminado = FALSE WHERE id = :pid2;` | `UPDATE 1` (A tiene la fila del pedido bloqueada; su disparador suma los detalles vigentes que ve) |
+| 2 | B | `BEGIN;` y `INSERT INTO pedido_detalle (pedido_id, producto_id, cantidad, precio_unitario, subtotal) VALUES (:pid2, 10, 1, 100.00, 100.00);` | **B se queda esperando**: su disparador pide `FOR SHARE` sobre un pedido que está eliminado. Con la versión defectuosa original (filtro `NOT p.eliminado` en el `WHERE`) B **no** esperaría, leería `eliminado = TRUE` y no sumaría la línea |
+| 3 | A | `SELECT pid, pg_blocking_pids(pid) AS bloqueado_por, wait_event_type FROM pg_stat_activity WHERE datname = current_database() AND cardinality(pg_blocking_pids(pid)) > 0;` | 1 fila: la sesión B, `wait_event_type = Lock`, bloqueada por A |
+| 4 | A | `COMMIT;` | `COMMIT`; B se destraba |
+| 5 | B | (se completa solo) | `INSERT 0 1`: B relee el pedido con `eliminado = FALSE` y **suma** la línea de 100,00 |
+| 6 | B | `COMMIT;` | `COMMIT` |
+| 7 | cualquiera | `SELECT * FROM v_auditoria_ventas_diarias;` | `(0 rows)`. Si la línea se hubiera perdido, aparecería 1 fila con `total_fuente` 100,00 mayor que `total_tabla` |
+
+**Variante 4 – REACTIVACIÓN, orden inverso: primero el detalle (B), después `UPDATE eliminado = FALSE` (A).** (antes, limpieza de abajo con `:pid2`)
+
+| Paso | Sesión | Comando | Resultado esperado |
+|------|--------|---------|--------------------|
+| 1 | B | `BEGIN;` y `INSERT INTO pedido_detalle (pedido_id, producto_id, cantidad, precio_unitario, subtotal) VALUES (:pid2, 10, 1, 100.00, 100.00);` | `INSERT 0 1` (pedido eliminado: no suma, pero B retiene `FOR SHARE` sobre la fila del pedido) |
+| 2 | A | `BEGIN;` y `UPDATE pedido SET eliminado = FALSE WHERE id = :pid2;` | **A se queda esperando** (`FOR SHARE` de B conflictúa con el `UPDATE`) |
+| 3 | B | `COMMIT;` | `COMMIT`; A se destraba |
+| 4 | A | (se completa solo) | `UPDATE 1`: el disparador de A ya ve el detalle de B y lo **suma** junto con los demás vigentes |
+| 5 | A | `COMMIT;` | `COMMIT` |
+| 6 | cualquiera | `SELECT * FROM v_auditoria_ventas_diarias;` | `(0 rows)` |
+
 **Limpieza (después de cada variante, en cualquier sesión; sin transacción abierta):**
 
 ```sql
 UPDATE pedido SET eliminado = FALSE WHERE id = :pid;                          -- UPDATE 1
 DELETE FROM pedido_detalle WHERE pedido_id = :pid AND producto_id = 10;       -- DELETE 1
 SELECT * FROM v_auditoria_ventas_diarias;                                     -- (0 rows)
+-- Variantes 3 y 4 (reactivación): volver a dejar el pedido eliminado y sin el detalle de prueba
+DELETE FROM pedido_detalle WHERE pedido_id = :pid2 AND producto_id = 10;      -- DELETE 1
+UPDATE pedido SET eliminado = TRUE WHERE id = :pid2;                          -- UPDATE 1
+SELECT * FROM v_auditoria_ventas_diarias;                                     -- (0 rows)
 ```
 
-- **Criterio de aprobación:** en ambas variantes se **observa la espera** (pasos 4/5 de la variante 1 y paso 2 de la variante 2) y la auditoría final y tras la limpieza devuelve `(0 rows)`. Si en la variante 1 la sesión B **no** espera (devuelve `UPDATE 1` al instante), el `FOR SHARE` no está actuando: la prueba falla.
-- **Nota:** esta prueba no pudo ejecutarse de forma automática (requiere dos sesiones). Su resultado esperado sale del mecanismo documentado en el informe (punto c) y en el script (sección 4): `FOR SHARE` conflictúa con `FOR NO KEY UPDATE`, que es el bloqueo del `UPDATE` de `pedido.eliminado`. El test automático `test_concurrencia.sql` solo verifica que el bloqueo está declarado en `fn_vdc_linea`.
-- [ ] Aprobada (variante 1)  [ ] Aprobada (variante 2)  [ ] Limpieza hecha y auditoría vacía
+- **Criterio de aprobación:** en las variantes 1 y 2 (baja) y 3 y 4 (reactivación) se **observa la espera** (pasos 4/5 de la variante 1, paso 2 de la 2, paso 2 de la 3 y paso 2 de la 4) y la auditoría final y tras la limpieza devuelve `(0 rows)`. Si en la variante 1 la sesión B **no** espera (devuelve `UPDATE 1` al instante), el `FOR SHARE` no está actuando: la prueba falla.
+- **Nota:** esta prueba no pudo ejecutarse de forma automática (requiere dos sesiones). Su resultado esperado sale del mecanismo documentado en el informe (punto c) y en el script (sección 4): `FOR SHARE` conflictúa con `FOR NO KEY UPDATE`, que es el bloqueo del `UPDATE` de `pedido.eliminado`. El test automático `test_concurrencia.sql` solo verifica que el bloqueo está declarado en `fn_vdc_linea` (y que no se filtra por `eliminado` en el `WHERE`). Las variantes 3 y 4 cubren el caso de la reactivación concurrente, que con el bloqueo condicionado a `NOT p.eliminado` perdía la línea.
+- [ ] Aprobada (variante 1)  [ ] Aprobada (variante 2)  [ ] Aprobada (variante 3)  [ ] Aprobada (variante 4)  [ ] Limpieza hecha y auditoría vacía
 
 ### Prueba 28 – Reversión de la desnormalización
 
