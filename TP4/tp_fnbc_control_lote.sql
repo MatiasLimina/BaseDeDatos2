@@ -31,14 +31,17 @@ DROP TABLE IF EXISTS lote                     CASCADE;
 CREATE TABLE lote (
     id         BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
     codigo     VARCHAR(30) NOT NULL UNIQUE,      -- codigo de lote: identificador de negocio, obligatorio y unico
-    created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+    activo     BOOLEAN NOT NULL DEFAULT TRUE,    -- baja logica (R7), sin borrado fisico
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    CONSTRAINT ck_lote_codigo_no_vacio CHECK (btrim(codigo) <> '')   -- evita codigos en blanco
 );
 
 CREATE TABLE deposito (
     id         BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
     nombre     VARCHAR(80) NOT NULL UNIQUE,      -- nombre obligatorio y unico por deposito
     activo     BOOLEAN NOT NULL DEFAULT TRUE,    -- baja logica (R7), sin borrado fisico
-    created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    CONSTRAINT ck_deposito_nombre_no_vacio CHECK (btrim(nombre) <> '')   -- evita nombres en blanco
 );
 
 CREATE TABLE usuario (
@@ -46,7 +49,9 @@ CREATE TABLE usuario (
     nombre     VARCHAR(60) NOT NULL,
     apellido   VARCHAR(60) NOT NULL,
     activo     BOOLEAN NOT NULL DEFAULT TRUE,    -- baja logica (R7), sin borrado fisico
-    created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    CONSTRAINT ck_usuario_nombre_no_vacio   CHECK (btrim(nombre)   <> ''),
+    CONSTRAINT ck_usuario_apellido_no_vacio CHECK (btrim(apellido) <> '')
 );
 
 -- Esquema ORIGINAL de la consigna: R(LoteID, DepositoID, ResponsableControlID)
@@ -130,6 +135,16 @@ CREATE TABLE control_lote (
     CONSTRAINT fk_cl_lote        FOREIGN KEY (lote_id)                REFERENCES lote (id)                                    ON DELETE RESTRICT,
     CONSTRAINT fk_cl_responsable FOREIGN KEY (responsable_control_id) REFERENCES responsable_deposito (responsable_control_id) ON DELETE RESTRICT
 );
+
+-- Indices de la descomposicion. Las PK ya cubren las busquedas por (lote) y por (responsable) en
+-- responsable_deposito; faltan los accesos inversos:
+-- Consulta que optimiza: "que lotes controla el responsable X" y la verificacion de la FK
+-- fk_cl_responsable al borrar/actualizar un responsable_deposito (la PK (lote_id, responsable_control_id)
+-- no sirve para buscar por la segunda columna).
+CREATE INDEX idx_control_lote_responsable ON control_lote (responsable_control_id);
+-- Consulta que optimiza: "que responsables tiene el deposito X" (listar el personal de un
+-- deposito) y la verificacion de fk_rd_deposito al borrar un deposito.
+CREATE INDEX idx_responsable_deposito_deposito ON responsable_deposito (deposito_id);
 
 COMMENT ON TABLE responsable_deposito IS 'FNBC: R -> D. Cada responsable de control pertenece a un unico deposito.';
 COMMENT ON TABLE control_lote         IS 'FNBC: que responsable controla cada lote. El deposito se obtiene via responsable_deposito.';
