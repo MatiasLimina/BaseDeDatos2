@@ -92,11 +92,11 @@ El paginador no se usará.
 (1 fila)
 
 === 6. PROPIEDAD Y HARDENING DE RUTINAS ===
- esquema |        rutina        |                                             argumentos                                              | security_definer |          configuracion          |   propietario    
----------+----------------------+-----------------------------------------------------------------------------------------------------+------------------+---------------------------------+------------------
- public  | fn_autenticar        | p_mail text, p_password text                                                                        | t                | {"search_path=public, pg_temp"} | rol_owner_codigo
- public  | fn_resetear_password | p_usuario_id bigint, p_nueva text                                                                   | t                | {"search_path=public, pg_temp"} | rol_owner_codigo
- public  | sp_registrar_pedido  | IN p_cliente_id bigint, IN p_forma_pago forma_pago_enum, IN p_items jsonb, INOUT p_pedido_id bigint | t                | {"search_path=public, pg_temp"} | rol_owner_codigo
+ esquema |        rutina        |                                             argumentos                                              | security_definer |                       configuracion                       |   propietario    
+---------+----------------------+-----------------------------------------------------------------------------------------------------+------------------+-----------------------------------------------------------+------------------
+ public  | fn_autenticar        | p_mail text, p_password text                                                                        | t                | {"search_path=public, pg_temp",client_min_messages=error} | rol_owner_codigo
+ public  | fn_resetear_password | p_usuario_id bigint, p_nueva text                                                                   | t                | {"search_path=public, pg_temp"}                           | rol_owner_codigo
+ public  | sp_registrar_pedido  | IN p_cliente_id bigint, IN p_forma_pago forma_pago_enum, IN p_items jsonb, INOUT p_pedido_id bigint | t                | {"search_path=public, pg_temp"}                           | rol_owner_codigo
 (3 filas)
 
 === 6.b PRIVILEGIOS EFECTIVOS DE EJECUCIÓN DE RUTINAS ===

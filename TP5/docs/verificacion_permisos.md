@@ -203,11 +203,11 @@ El paginador no se usará.
 (1 fila)
 
 === 6. PROPIEDAD Y HARDENING DE RUTINAS ===
- esquema |        rutina        |                                             argumentos                                              | security_definer |          configuracion          |   propietario    
----------+----------------------+-----------------------------------------------------------------------------------------------------+------------------+---------------------------------+------------------
- public  | fn_autenticar        | p_mail text, p_password text                                                                        | t                | {"search_path=public, pg_temp"} | rol_owner_codigo
- public  | fn_resetear_password | p_usuario_id bigint, p_nueva text                                                                   | t                | {"search_path=public, pg_temp"} | rol_owner_codigo
- public  | sp_registrar_pedido  | IN p_cliente_id bigint, IN p_forma_pago forma_pago_enum, IN p_items jsonb, INOUT p_pedido_id bigint | t                | {"search_path=public, pg_temp"} | rol_owner_codigo
+ esquema |        rutina        |                                             argumentos                                              | security_definer |                       configuracion                       |   propietario    
+---------+----------------------+-----------------------------------------------------------------------------------------------------+------------------+-----------------------------------------------------------+------------------
+ public  | fn_autenticar        | p_mail text, p_password text                                                                        | t                | {"search_path=public, pg_temp",client_min_messages=error} | rol_owner_codigo
+ public  | fn_resetear_password | p_usuario_id bigint, p_nueva text                                                                   | t                | {"search_path=public, pg_temp"}                           | rol_owner_codigo
+ public  | sp_registrar_pedido  | IN p_cliente_id bigint, IN p_forma_pago forma_pago_enum, IN p_items jsonb, INOUT p_pedido_id bigint | t                | {"search_path=public, pg_temp"}                           | rol_owner_codigo
 (3 filas)
 
 === 6.b PRIVILEGIOS EFECTIVOS DE EJECUCIÓN DE RUTINAS ===
@@ -275,7 +275,7 @@ El paginador no se usará.
   - `reportes_select_mv = true`
   - `reportes_select_usuario = false`
   - `app_web_select_usuario = false`
-- **Rutinas (bloque 6):** las tres tienen `security_definer = t`, `configuracion = {"search_path=public, pg_temp"}` y propietario `rol_owner_codigo`. Ninguna corre como superusuario.
+- **Rutinas (bloque 6):** las tres tienen `security_definer = t`, `search_path=public, pg_temp` fijo y propietario `rol_owner_codigo`. Ninguna corre como superusuario. `fn_autenticar` además fija `client_min_messages=error`, para que el registro de cada intento de inicio de sesión (Parte C) no le llegue al cliente.
 - **Privilegios de ejecución (bloque 6.b):** `fn_autenticar` solo para `rol_app_lectura`, `rol_app_escritura`, `app_web` y el dueño; `fn_resetear_password` solo para `rol_soporte` y el dueño; `sp_registrar_pedido` solo para `rol_app_escritura`, `app_web`, `admin_datos` y el dueño. `rol_reportes` no ejecuta ninguna rutina.
 - **pgcrypto (bloque 6.c):** `crypt` y `gen_salt` solo son ejecutables por `rol_owner_codigo`; ningún rol de negocio puede fabricar hashes.
 - **Objetos futuros (bloque 7):** `pg_default_acl` registra la política para funciones (`f`) y tipos (`T`) del rol `postgres`, sin `EXECUTE` ni `USAGE` para `PUBLIC`.
