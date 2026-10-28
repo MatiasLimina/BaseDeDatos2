@@ -1,0 +1,13 @@
+﻿2026-10-28T18:09:46 ERROR respaldo de no_existe fallido: psql (conteos) termino con codigo 2: psql: error: connection to server at "localhost" (::1), port 5432 failed: FATAL:  no existe la base de datos �no_existe�
+2026-10-28T18:09:47 ERROR respaldo de foodstore fallido: psql (conteos) termino con codigo 2: psql: error: connection to server at "localhost" (::1), port 5432 failed: fe_sendauth: no password supplied
+2026-10-28T18:09:51 OK foodstore_20261028_180949.dump 3,7 MB en 0,9 s; conteos en foodstore_20261028_180949.counts.csv
+2026-10-28T18:09:55 ERROR respaldo de foodstore fallido: psql (conteos) termino con codigo 1: ERROR:  cancelando la sentencia debido a que se agotó el tiempo de espera de “locks” | LINE 2: UNION ALL SELECT 'cliente', COUNT(*) FROM cliente |                                                   ^
+2026-10-28T18:10:04 OK foodstore_20261028_181003.dump 3,7 MB en 0,9 s; conteos en foodstore_20261028_181003.counts.csv
+2026-10-28T18:10:46 OK foodstore_20261028_181034.dump 3,7 MB en 11,6 s; conteos en foodstore_20261028_181034.counts.csv
+2026-10-28T18:11:26 OK foodstore_20261028_181114.dump 3,7 MB en 11,6 s; conteos en foodstore_20261028_181114.counts.csv
+2026-10-28T18:11:33 ERROR respaldo de foodstore fallido: psql (conteos) termino con codigo 1: ERROR:  cancelando la sentencia debido a que se agotó el tiempo de espera de “locks” | LINE 2: UNION ALL SELECT 'cliente', COUNT(*) FROM cliente |                                                   ^
+2026-10-28T18:11:43 OK foodstore_20261028_181142.dump 3,7 MB en 0,9 s; conteos en foodstore_20261028_181142.counts.csv
+2026-10-28T18:12:19 ERROR respaldo de foodstore fallido: pg_dump termino con codigo 1: pg_dump: error: query failed: ERROR:  cancelando la sentencia debido a que se agotó el tiempo de espera de sentencias | pg_dump: detail: Query was: LOCK TABLE public.categoria, public.producto, public.cliente, public.pedido, public.pedido_detalle IN ACCESS SHARE MODE
+2026-10-28T18:12:41 OK foodstore_20261028_181240.dump 3,7 MB en 0,9 s; conteos en foodstore_20261028_181240.counts.csv
+2026-10-28T18:14:50 OK foodstore_20261028_181449.dump 3,7 MB en 0,8 s; conteos en foodstore_20261028_181449.counts.csv
+2026-10-28T18:14:51 ERROR respaldo de no_existe fallido: psql (conteos) termino con codigo 2: psql: error: connection to server at "localhost" (::1), port 5432 failed: FATAL:  no existe la base de datos �no_existe�

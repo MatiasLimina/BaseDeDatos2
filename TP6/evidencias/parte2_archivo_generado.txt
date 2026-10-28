@@ -1,0 +1,27 @@
+$ ls -l backups/foodstore_20261028_181449.dump backups/foodstore_20261028_181449.counts.csv
+-rw-r--r-- 1 Nico 197121      98 Oct 28 18:14 backups/foodstore_20261028_181449.counts.csv
+-rw-r--r-- 1 Nico 197121 3915477 Oct 28 18:14 backups/foodstore_20261028_181449.dump
+
+$ cat backups/foodstore_20261028_181449.counts.csv
+tabla;filas
+categoria;3
+cliente;20003
+producto;50005
+pedido;200001
+pedido_detalle;621853
+
+$ pg_restore --list backups/foodstore_20261028_181449.dump | head -14
+;
+; Archive created at 2026-10-28 18:14:49
+;     dbname: foodstore
+;     TOC Entries: 53
+;     Compression: gzip
+;     Dump Version: 1.16-0
+;     Format: CUSTOM
+;     Integer: 4 bytes
+;     Offset: 8 bytes
+;     Dumped from database version: 17.11
+;     Dumped by pg_dump version: 17.11
+;
+;
+; Selected TOC Entries:

@@ -13,20 +13,20 @@ Integrantes: Matias Limina - Nicolas Monjelardi - Lautaro Aguero
 | Revisión de mantenimiento | `maintenance.sql` | Semanal, domingo | Muestra tuplas muertas frente al umbral de autovacuum, la configuración de autovacuum y la antigüedad de las estadísticas. Solo ejecuta `VACUUM (ANALYZE)` o `ANALYZE` sobre las tablas que superan el umbral en esa misma observación. |
 | Restauración de prueba | `restore_test.ps1` | Semanal, domingo, después de la revisión | La última copia se restaura en `foodstore_restore_test`. Los conteos por tabla coinciden con los que se registraron antes del respaldo y los controles de productos y detalles inválidos devuelven 0. Se registran el RTO y el RPO observados. |
 
-Programación prevista: Programador de tareas de Windows. Antes de programarse, cada script se ejecuta y se verifica a mano.
+Programación prevista: Programador de tareas de Windows, con un tiempo máximo de ejecución de 30 min por tarea ("Detener la tarea si se ejecuta durante más de"). Antes de programarse, cada script se ejecuta y se verifica a mano.
 
 ## Reglas de seguridad
 
 1. **Sin contraseñas en el repositorio.** La autenticación sale de `%APPDATA%\postgresql\pgpass.conf`, que es personal y no se versiona. Los scripts usan `-w` (no preguntar nunca): si falta la credencial, fallan en lugar de quedar esperando. No se usa `PGPASSWORD`.
 2. **`foodstore` no se borra, no se reemplaza ni se restaura.** El ensayo solo crea, borra y restaura `foodstore_restore_test`. El script se niega a continuar si el destino es otra base.
 3. **Respaldo en formato custom (`-Fc`)**, que es el que puede leer `pg_restore`. Se restaura con `--no-owner --no-privileges`, porque los roles son del clúster y no viajan dentro de la copia.
-4. **Fallo visible.** Si `pg_dump` falla, el script borra el archivo parcial, escribe una línea `ERROR` en el log y termina con un código distinto de 0.
+4. **Fallo visible.** Si `pg_dump` falla, el script borra el archivo parcial, escribe una línea `ERROR` en el log y termina con un código distinto de 0. Un bloqueo de otra sesión tampoco puede dejarlo esperando sin límite: los conteos usan `lock_timeout`, `pg_dump` usa `--lock-wait-timeout` y lo que queda sin cubrir lo corta el tiempo máximo de la tarea. Ese último corte no deja línea `ERROR` ni borra archivos parciales: queda solo en el historial de la tarea.
 5. **Mantenimiento no bloqueante.** `VACUUM FULL` está excluido del plan periódico, porque toma un bloqueo exclusivo y reescribe la tabla. Todo `VACUUM` o `ANALYZE` manual debe justificarse con la observación previa del estado de las tablas.
 6. **Revisión humana.** Los scripts los genera un asistente de IA (Claude Code) a partir de esta SPEC y de `AGENTS.md`. Ningún comando suyo se ejecuta sin haberlo leído antes, y todo script se prueba (incluido su caso de error) antes de aceptarlo.
 
 ## Validación de la restauración
 
-Los conteos de `categoria`, `cliente`, `producto`, `pedido` y `pedido_detalle` se toman inmediatamente antes de `pg_dump` y quedan junto a la copia. En el esquema la tabla de detalle se llama `pedido_detalle`, no `detalle_pedido` como en la consigna. Además se ejecutan los controles `precio < 0 OR stock < 0` sobre `producto` y `cantidad <= 0 OR precio_unitario < 0` sobre `pedido_detalle`.
+Los conteos de `categoria`, `cliente`, `producto`, `pedido` y `pedido_detalle` se toman inmediatamente antes de `pg_dump` y quedan junto a la copia. No salen de la misma instantánea que el respaldo: coinciden solo si nadie escribe entre ambos pasos, como pasa en el laboratorio a las 02:00. En el esquema la tabla de detalle se llama `pedido_detalle`, no `detalle_pedido` como en la consigna. Además se ejecutan los controles `precio < 0 OR stock < 0` sobre `producto` y `cantidad <= 0 OR precio_unitario < 0` sobre `pedido_detalle`.
 
 ## Objetivos de recuperación (laboratorio)
 
