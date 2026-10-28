@@ -1,0 +1,15 @@
+Respaldo:   foodstore_20261028_181449.dump (3,7 MB), creado 2026-10-28 18:14:49
+Simulacro:  2026-10-28 18:57:38
+RPO observado (antiguedad del respaldo): 0d 00:42:49
+
+Validacion           esperado    restaurado
+categoria                   3             3  OK
+cliente                 20003         20003  OK
+producto                50005         50005  OK
+pedido                 200001        200001  OK
+pedido_detalle         621853        621853  OK
+productos_invalidos          0             0  OK
+detalles_invalidos          0             0  OK
+
+RTO observado: 13,0 s (createdb 1,1 s, pg_restore 11,5 s, validacion 0,4 s)
+ANALYZE posterior (fuera del RTO): 3,1 s

@@ -1,0 +1,44 @@
+       momento       |          base          | version | tamano_base 
+---------------------+------------------------+---------+-------------
+ 2026-10-28 18:58:07 | foodstore_restore_test | 17.11   | 98 MB
+
+== 1. Conexiones y transacciones
+ conexiones | max_conexiones | xact_commit | xact_rollback | pct_rollback | deadlocks | temp_files | temp_bytes | pct_cache_hit | desde 
+------------+----------------+-------------+---------------+--------------+-----------+------------+------------+---------------+-------
+          1 |            100 |         176 |             0 |         0.00 |         0 |         13 | 49 MB      |         80.48 | -
+
+ estado | sesiones 
+--------+----------
+
+== 2. Consultas activas
+ pid | usuario | estado | duracion | wait_event_type | consulta 
+-----+---------+--------+----------+-----------------+----------
+
+== 2b. Sesiones bloqueadas (y quién las bloquea)
+ pid | bloqueada_por | esperando | consulta 
+-----+---------------+-----------+----------
+
+== 3. Estado de tablas
+            tabla             | n_live_tup | n_dead_tup | pct_muertas |    ultimo_vacuum    |   ultimo_analyze    
+------------------------------+------------+------------+-------------+---------------------+---------------------
+ categoria                    |          3 |          0 |        0.00 | -                   | 2026-10-28 18:57:54
+ cliente                      |      20003 |          0 |        0.00 | 2026-10-28 18:58:01 | 2026-10-28 18:57:54
+ mv_facturacion_categoria_mes |         13 |          0 |        0.00 | -                   | 2026-10-28 18:57:54
+ pedido                       |     200001 |          0 |        0.00 | 2026-10-28 18:57:55 | 2026-10-28 18:57:53
+ pedido_detalle               |     621853 |          0 |        0.00 | 2026-10-28 18:58:00 | 2026-10-28 18:57:53
+ producto                     |      50005 |          0 |        0.00 | 2026-10-28 18:58:01 | 2026-10-28 18:57:53
+
+ edad_xid | freeze_max_age | pct_del_limite 
+----------+----------------+----------------
+      826 |      200000000 |           0.00
+
+== 4. Tamaño por tabla
+            tabla             |  total  |   datos    | indices 
+------------------------------+---------+------------+---------
+ pedido_detalle               | 59 MB   | 41 MB      | 19 MB
+ pedido                       | 19 MB   | 14 MB      | 5776 kB
+ producto                     | 6984 kB | 4288 kB    | 2664 kB
+ cliente                      | 5088 kB | 2176 kB    | 2880 kB
+ categoria                    | 40 kB   | 8192 bytes | 32 kB
+ mv_facturacion_categoria_mes | 40 kB   | 8192 bytes | 16 kB
+

@@ -1,0 +1,9 @@
+objeto                        foodstore restore_test
+tablas                               5          5 OK
+vistas                               3          3 OK
+vistas_materializadas                1          1 OK
+funciones_y_procedimientos           5          5 OK
+triggers                             2          2 OK
+indices                             12         12 OK
+restricciones                       16         16 OK
+tipos_enum                           1          1 OK

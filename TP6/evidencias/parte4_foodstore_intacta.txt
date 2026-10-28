@@ -1,0 +1,11 @@
+-- foodstore antes y después del simulacro del 28/10/2026 18:57:38
+-- Valores registrados en la terminal en ese momento (antes: 18:57:3x, después: 18:58):
+antes:   oid=24580  categoria=3 cliente=20003 producto=50005 pedido=200001 pedido_detalle=621853
+después: oid=24580  pedido_detalle=621853
+
+-- Verificación posterior (2026-10-28 19:04:01):
+  oid  | categoria | cliente | producto | pedido | pedido_detalle 
+-------+-----------+---------+----------+--------+----------------
+ 24580 |         3 |   20003 |    50005 | 200001 |         621853
+(1 fila)
+
