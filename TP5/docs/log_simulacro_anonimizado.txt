@@ -1,0 +1,29 @@
+2026-10-28 15:24:28.181 -03 [27520] sesion=6ae23ddc.6b80 user=[unknown] db=[unknown] app=[unknown] client=::1 LOG:  connection received: host=::1 port=60531
+2026-10-28 15:24:28.193 -03 [27520] sesion=6ae23ddc.6b80 user=app_web db=foodstore_tp5 app=[unknown] client=::1 LOG:  connection authenticated: identity="app_web" method=scram-sha-256 (<PGDATA>/pg_hba.conf:123)
+2026-10-28 15:24:28.193 -03 [27520] sesion=6ae23ddc.6b80 user=app_web db=foodstore_tp5 app=[unknown] client=::1 LOG:  connection authorized: user=app_web database=foodstore_tp5 application_name=psql
+2026-10-28 15:24:28.205 -03 [27520] sesion=6ae23ddc.6b80 user=app_web db=foodstore_tp5 app=psql client=::1 WARNING:  fn_autenticar: intento fallido mail=usuario7@ejemplo.test
+2026-10-28 15:24:28.205 -03 [27520] sesion=6ae23ddc.6b80 user=app_web db=foodstore_tp5 app=psql client=::1 CONTEXT:  PL/pgSQL function fn_autenticar(text,text) line 17 at RAISE
+2026-10-28 15:24:28.208 -03 [27520] sesion=6ae23ddc.6b80 user=app_web db=foodstore_tp5 app=psql client=::1 WARNING:  fn_autenticar: intento fallido mail=usuario7@ejemplo.test
+2026-10-28 15:24:28.208 -03 [27520] sesion=6ae23ddc.6b80 user=app_web db=foodstore_tp5 app=psql client=::1 CONTEXT:  PL/pgSQL function fn_autenticar(text,text) line 17 at RAISE
+2026-10-28 15:24:28.211 -03 [27520] sesion=6ae23ddc.6b80 user=app_web db=foodstore_tp5 app=psql client=::1 WARNING:  fn_autenticar: intento fallido mail=usuario7@ejemplo.test
+2026-10-28 15:24:28.211 -03 [27520] sesion=6ae23ddc.6b80 user=app_web db=foodstore_tp5 app=psql client=::1 CONTEXT:  PL/pgSQL function fn_autenticar(text,text) line 17 at RAISE
+2026-10-28 15:24:28.215 -03 [27520] sesion=6ae23ddc.6b80 user=app_web db=foodstore_tp5 app=psql client=::1 WARNING:  fn_autenticar: intento fallido mail=usuario7@ejemplo.test
+2026-10-28 15:24:28.215 -03 [27520] sesion=6ae23ddc.6b80 user=app_web db=foodstore_tp5 app=psql client=::1 CONTEXT:  PL/pgSQL function fn_autenticar(text,text) line 17 at RAISE
+2026-10-28 15:24:28.218 -03 [27520] sesion=6ae23ddc.6b80 user=app_web db=foodstore_tp5 app=psql client=::1 WARNING:  fn_autenticar: intento fallido mail=usuario7@ejemplo.test
+2026-10-28 15:24:28.218 -03 [27520] sesion=6ae23ddc.6b80 user=app_web db=foodstore_tp5 app=psql client=::1 CONTEXT:  PL/pgSQL function fn_autenticar(text,text) line 17 at RAISE
+2026-10-28 15:24:28.221 -03 [27520] sesion=6ae23ddc.6b80 user=app_web db=foodstore_tp5 app=psql client=::1 WARNING:  fn_autenticar: inicio de sesión exitoso usuario_id=7 mail=usuario7@ejemplo.test
+2026-10-28 15:24:28.221 -03 [27520] sesion=6ae23ddc.6b80 user=app_web db=foodstore_tp5 app=psql client=::1 CONTEXT:  PL/pgSQL function fn_autenticar(text,text) line 14 at RAISE
+2026-10-28 15:24:28.221 -03 [27520] sesion=6ae23ddc.6b80 user=app_web db=foodstore_tp5 app=psql client=::1 ERROR:  permission denied for table usuario
+2026-10-28 15:24:28.221 -03 [27520] sesion=6ae23ddc.6b80 user=app_web db=foodstore_tp5 app=psql client=::1 STATEMENT:  SELECT * FROM usuario;
+2026-10-28 15:24:28.222 -03 [27520] sesion=6ae23ddc.6b80 user=app_web db=foodstore_tp5 app=psql client=::1 ERROR:  permission denied for table usuario
+2026-10-28 15:24:28.222 -03 [27520] sesion=6ae23ddc.6b80 user=app_web db=foodstore_tp5 app=psql client=::1 STATEMENT:  SELECT id, nombre, apellido, mail, celular FROM usuario;
+2026-10-28 15:24:28.222 -03 [27520] sesion=6ae23ddc.6b80 user=app_web db=foodstore_tp5 app=psql client=::1 LOG:  statement: GRANT admin_datos TO app_web;
+2026-10-28 15:24:28.222 -03 [27520] sesion=6ae23ddc.6b80 user=app_web db=foodstore_tp5 app=psql client=::1 ERROR:  permission denied to grant role "admin_datos"
+2026-10-28 15:24:28.222 -03 [27520] sesion=6ae23ddc.6b80 user=app_web db=foodstore_tp5 app=psql client=::1 DETAIL:  Only roles with the ADMIN option on role "admin_datos" may grant this role.
+2026-10-28 15:24:28.222 -03 [27520] sesion=6ae23ddc.6b80 user=app_web db=foodstore_tp5 app=psql client=::1 STATEMENT:  GRANT admin_datos TO app_web;
+2026-10-28 15:24:28.222 -03 [27520] sesion=6ae23ddc.6b80 user=app_web db=foodstore_tp5 app=psql client=::1 ERROR:  permission denied to set role "admin_datos"
+2026-10-28 15:24:28.222 -03 [27520] sesion=6ae23ddc.6b80 user=app_web db=foodstore_tp5 app=psql client=::1 STATEMENT:  SET ROLE admin_datos;
+2026-10-28 15:24:28.222 -03 [27520] sesion=6ae23ddc.6b80 user=app_web db=foodstore_tp5 app=psql client=::1 LOG:  statement: UPDATE usuario SET rol = 'ADMIN' WHERE mail = 'usuario7@ejemplo.test';
+2026-10-28 15:24:28.222 -03 [27520] sesion=6ae23ddc.6b80 user=app_web db=foodstore_tp5 app=psql client=::1 ERROR:  permission denied for table usuario
+2026-10-28 15:24:28.222 -03 [27520] sesion=6ae23ddc.6b80 user=app_web db=foodstore_tp5 app=psql client=::1 STATEMENT:  UPDATE usuario SET rol = 'ADMIN' WHERE mail = 'usuario7@ejemplo.test';
+2026-10-28 15:24:28.261 -03 [27520] sesion=6ae23ddc.6b80 user=app_web db=foodstore_tp5 app=psql client=::1 LOG:  disconnection: session time: 0:00:00.087 user=app_web database=foodstore_tp5 host=::1 port=60531
