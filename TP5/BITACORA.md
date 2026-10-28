@@ -43,7 +43,10 @@ En esta parte no se usó OpenCode: todo el trabajo se hizo con *Claude Code*. Se
 
 ## Parte D — Anonimización
 
-*(pendiente)*
+| # | Prompt enviado a la IA | Respuesta relevante recibida | Validación o corrección humana aplicada |
+|---|---|---|---|
+| D-1 | *OpenCode · gemini-3.5-flash* (sesión `ses_e7c20665…`, 28/10 15:57), en una carpeta aislada y sin acceso a la base. Se le especificó con precisión la agregación: estructura de `usuario_anon` y de `usuario`; una fila por mes de alta y rol; mes calculado en `America/Argentina/Buenos_Aires` y truncado como `DATE`, sin depender de la zona de la sesión; columnas `mes_alta, rol, total_cuentas, cuentas_activas`; incluir las bajas; orden por mes y rol. Se le pidió la consulta sobre `usuario_anon` y la equivalente sobre `usuario`. | Ninguna. El proveedor rechazó el pedido con *"You exceeded your current quota, please check your plan and billing details"*, pero el comando quedó esperando sin mostrar el error. | A los 10 minutos sin respuesta, el equipo decidió cancelarlo y hacer el punto con Claude Code. La causa real (cuota agotada, no demora) se encontró después, al revisar el registro de la sesión, y se corrigió la nota de `docs/verificacion_equivalencia.md`, que primero la atribuía a la demora. |
+| D-2 | *Claude Code.* "Dejá de consultar a OpenCode y mejor hagamos las cosas acá mismo", con la especificación de D-1. | Escribió `sql/usuario_anon.sql` (patrón de la Clase 2 con `activo`), `sql/test_usuario_anon.sql` y `sql/equivalencia_usuario_anon.sql`, con las dos consultas, el lado a lado y la diferencia simétrica evaluada con tres zonas horarias de sesión. | Ciclo TDD: el test falló sin la tabla y pasó después. Se comprobó con mutaciones que las verificaciones detectan errores: un mail real infiltrado, un `GRANT` a `rol_reportes` y un rol alterado en `usuario_anon`; los tres hicieron fallar el test correspondiente. Resultado: 8 grupos idénticos y diferencia simétrica vacía en las tres zonas. |
 
 ## Parte E — Cierre
 
