@@ -1,0 +1,43 @@
+       momento       |   base    
+---------------------+-----------
+ 2026-10-28 18:48:51 | foodstore
+
+== 1. Configuración de autovacuum
+            parametro            | valor | unidad 
+---------------------------------+-------+--------
+ autovacuum                      | on    | -
+ autovacuum_analyze_scale_factor | 0.1   | -
+ autovacuum_analyze_threshold    | 50    | -
+ autovacuum_naptime              | 60    | s
+ autovacuum_vacuum_scale_factor  | 0.2   | -
+ autovacuum_vacuum_threshold     | 50    | -
+ track_counts                    | on    | -
+
+== 2. Revisión (antes)
+            tabla             | n_live_tup | n_dead_tup | umbral_vacuum | n_mod_since_analyze | umbral_analyze | tiene_estadisticas |    ultimo_vacuum    |   ultimo_analyze    | accion |         motivo         
+------------------------------+------------+------------+---------------+---------------------+----------------+--------------------+---------------------+---------------------+--------+------------------------
+ categoria                    |          3 |          0 |            51 |                   0 |             50 | t                  | -                   | 2026-10-28 18:32:58 | -      | dentro de los umbrales
+ cliente                      |      20003 |          0 |          4051 |                   0 |           2050 | t                  | 2026-10-28 18:04:15 | 2026-10-28 18:03:22 | -      | dentro de los umbrales
+ mv_facturacion_categoria_mes |          1 |          0 |            50 |                   0 |             50 | t                  | -                   | 2026-10-28 18:32:58 | -      | dentro de los umbrales
+ pedido                       |     200001 |          0 |         40050 |                   0 |          20050 | t                  | 2026-10-28 18:04:15 | 2026-10-28 18:03:22 | -      | dentro de los umbrales
+ pedido_detalle               |     621853 |          0 |        124421 |                   0 |          62235 | t                  | 2026-10-28 18:04:15 | 2026-10-28 18:03:22 | -      | dentro de los umbrales
+ producto                     |      50005 |          0 |         10051 |                   0 |           5050 | t                  | 2026-10-28 18:04:15 | 2026-10-28 18:03:22 | -      | dentro de los umbrales
+
+== 3. Acciones
+                           resumen                            
+--------------------------------------------------------------
+ Sin acciones: todas las tablas están dentro de los umbrales.
+
+ sentencia 
+-----------
+
+== 4. Revisión (después)
+            tabla             | n_live_tup | n_dead_tup | umbral_vacuum | n_mod_since_analyze | umbral_analyze | tiene_estadisticas |    ultimo_vacuum    |   ultimo_analyze    | accion 
+------------------------------+------------+------------+---------------+---------------------+----------------+--------------------+---------------------+---------------------+--------
+ categoria                    |          3 |          0 |            51 |                   0 |             50 | t                  | -                   | 2026-10-28 18:32:58 | -
+ cliente                      |      20003 |          0 |          4051 |                   0 |           2050 | t                  | 2026-10-28 18:04:15 | 2026-10-28 18:03:22 | -
+ mv_facturacion_categoria_mes |          1 |          0 |            50 |                   0 |             50 | t                  | -                   | 2026-10-28 18:32:58 | -
+ pedido                       |     200001 |          0 |         40050 |                   0 |          20050 | t                  | 2026-10-28 18:04:15 | 2026-10-28 18:03:22 | -
+ pedido_detalle               |     621853 |          0 |        124421 |                   0 |          62235 | t                  | 2026-10-28 18:04:15 | 2026-10-28 18:03:22 | -
+ producto                     |      50005 |          0 |         10051 |                   0 |           5050 | t                  | 2026-10-28 18:04:15 | 2026-10-28 18:03:22 | -
+

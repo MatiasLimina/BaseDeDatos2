@@ -1,0 +1,40 @@
+       momento       |   base    | version | tamano_base 
+---------------------+-----------+---------+-------------
+ 2026-10-28 18:27:32 | foodstore | 17.11   | 100 MB
+
+== 1. Conexiones y transacciones
+ conexiones | max_conexiones | xact_commit | xact_rollback | pct_rollback | deadlocks | temp_files | temp_bytes | pct_cache_hit | desde 
+------------+----------------+-------------+---------------+--------------+-----------+------------+------------+---------------+-------
+          3 |            100 |         478 |            28 |         5.53 |         0 |          7 | 52 MB      |        100.00 | -
+
+ estado | sesiones 
+--------+----------
+ active |        2
+
+== 2. Consultas activas
+  pid  | usuario  | estado | duracion | wait_event_type |                                consulta                                
+-------+----------+--------+----------+-----------------+------------------------------------------------------------------------
+ 12276 | postgres | active | 00:00:06 | Timeout         | BEGIN; LOCK TABLE cliente IN ACCESS EXCLUSIVE MODE; SELECT pg_sleep(20
+ 32044 | postgres | active | 00:00:03 | Lock            | SELECT count(*) FROM cliente;
+
+== 2b. Sesiones bloqueadas (y quién las bloquea)
+  pid  | bloqueada_por | esperando |           consulta            
+-------+---------------+-----------+-------------------------------
+ 32044 | {12276}       | 00:00:03  | SELECT count(*) FROM cliente;
+
+== 3. Estado de tablas
+            tabla             | n_live_tup | n_dead_tup | pct_muertas |    ultimo_vacuum    |   ultimo_analyze    
+------------------------------+------------+------------+-------------+---------------------+---------------------
+ categoria                    |          3 |          0 |        0.00 | -                   | -
+ cliente                      |      20003 |          0 |        0.00 | 2026-10-28 18:04:15 | 2026-10-28 18:03:22
+ mv_facturacion_categoria_mes |          1 |          0 |        0.00 | -                   | -
+ pedido                       |     200001 |          0 |        0.00 | 2026-10-28 18:04:15 | 2026-10-28 18:03:22
+ pedido_detalle               |     621853 |          0 |        0.00 | 2026-10-28 18:04:15 | 2026-10-28 18:03:22
+ producto                     |      50005 |          0 |        0.00 | 2026-10-28 18:04:15 | 2026-10-28 18:03:22
+
+ edad_xid | freeze_max_age | pct_del_limite 
+----------+----------------+----------------
+      108 |      200000000 |           0.00
+
+== 4. Tamaño por tabla
+SET

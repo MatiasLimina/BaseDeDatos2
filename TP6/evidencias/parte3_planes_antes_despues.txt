@@ -1,0 +1,7 @@
+-- EXPLAIN antes de maintenance.sql (categoria y la vista materializada sin estadísticas)
+Seq Scan on categoria  (cost=0.00..13.60 rows=360 width=195)
+Seq Scan on mv_facturacion_categoria_mes  (cost=0.00..1.01 rows=1 width=226)
+
+-- EXPLAIN después del ANALYZE
+Seq Scan on categoria  (cost=0.00..1.03 rows=3 width=25)
+Seq Scan on mv_facturacion_categoria_mes  (cost=0.00..1.01 rows=1 width=29)
