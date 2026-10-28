@@ -141,7 +141,9 @@ $$;
 DO $$
 DECLARE
     v_marca  TEXT := 'test' || to_char(clock_timestamp(), 'HH24MISSUS');
-    v_clave  TEXT := 'ClaveQueNoDebeLoguearse' || v_marca;
+    -- Literal a propósito: si el servidor agregara la línea STATEMENT al
+    -- registro, el texto de este bloque (con la clave) llegaría al log.
+    v_clave  TEXT := 'ClaveLiteralQueNoDebeLoguearse';
     v_log    TEXT;
     v_inicio BIGINT;
 BEGIN

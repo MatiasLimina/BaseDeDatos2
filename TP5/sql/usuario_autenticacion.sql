@@ -97,10 +97,17 @@ ON CONFLICT (mail) DO NOTHING;
 -- La comparación usa el hash guardado como sal: crypt(clave, hash) = hash.
 --
 -- Auditoría (Clase 1: "debe auditarse: intentos fallidos de login"):
--- cada intento queda en el log del servidor con RAISE LOG, que no llega
--- al cliente. Con log_statement = 'mod' un SELECT no se registra, así que
--- sin esto un ataque de fuerza bruta contra la aplicación sería invisible.
---   * Nunca se registra la clave probada.
+-- cada intento queda en el log del servidor. Con log_statement = 'mod' un
+-- SELECT no se registra, así que sin esto un ataque de fuerza bruta contra
+-- la aplicación sería invisible.
+--   * Nunca se registra la clave probada. Por eso el nivel es WARNING y no
+--     LOG: para el log del servidor LOG está por encima de
+--     log_min_error_statement (error) y PostgreSQL agrega una línea
+--     STATEMENT con la sentencia completa, que incluye la clave en texto
+--     plano. WARNING queda por debajo (sin STATEMENT) y por encima de
+--     log_min_messages (warning), así que se registra igual.
+--   * SET client_min_messages = error: el aviso no le llega al cliente,
+--     para no anunciarle al atacante que está siendo registrado.
 --   * El mail lo escribe el atacante: se reemplazan los caracteres de
 --     control y se corta a 120 caracteres para que no pueda inyectar
 --     líneas falsas en el log.
@@ -116,6 +123,7 @@ RETURNS TABLE (usuario_id BIGINT, rol rol_usuario_enum)
 LANGUAGE plpgsql
 STABLE
 SET search_path = public, pg_temp
+SET client_min_messages = error
 AS $$
 DECLARE
     v_mail_log TEXT := left(regexp_replace(coalesce(p_mail, ''), '[[:cntrl:]]', '?', 'g'), 120);
@@ -129,10 +137,10 @@ BEGIN
           AND u.contrasena = public.crypt(p_password, u.contrasena);
 
     IF FOUND THEN
-        RAISE LOG 'fn_autenticar: inicio de sesión exitoso usuario_id=% mail=%',
+        RAISE WARNING 'fn_autenticar: inicio de sesión exitoso usuario_id=% mail=%',
             (SELECT u.id FROM public.usuario u WHERE u.mail = lower(btrim(p_mail))), v_mail_log;
     ELSE
-        RAISE LOG 'fn_autenticar: intento fallido mail=%', v_mail_log;
+        RAISE WARNING 'fn_autenticar: intento fallido mail=%', v_mail_log;
     END IF;
 END;
 $$;
