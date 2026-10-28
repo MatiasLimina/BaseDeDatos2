@@ -162,26 +162,8 @@ FROM PUBLIC;
 -- Las funciones creadas por el usuario reciben EXECUTE de PUBLIC por
 -- defecto en PostgreSQL. El REVOKE de cada rutina de Food Store se
 -- ejecuta después de crearla/alterarla, más abajo, para que el script
--- también funcione en una base donde aún no exista.
-
--- fn_autenticar se endurece de forma genérica para no depender de su
--- firma exacta: se revoca PUBLIC y se permite solo a la aplicación.
-DO $$
-DECLARE
-    r RECORD;
-BEGIN
-    FOR r IN
-        SELECT p.oid::regprocedure AS sig
-        FROM pg_proc p
-        JOIN pg_namespace n ON n.oid = p.pronamespace
-        WHERE n.nspname = 'public'
-          AND p.proname = 'fn_autenticar'
-    LOOP
-        EXECUTE format('REVOKE ALL ON FUNCTION %s FROM PUBLIC', r.sig);
-        EXECUTE format('GRANT EXECUTE ON FUNCTION %s TO rol_app_lectura', r.sig);
-    END LOOP;
-END
-$$;
+-- también funcione en una base donde aún no exista. fn_autenticar se
+-- endurece completa en un único bloque (sección 11.b).
 
 -- ---------------------------------------------------------------------
 -- 5. rol_app_lectura — catálogo y consulta de pedidos por vistas

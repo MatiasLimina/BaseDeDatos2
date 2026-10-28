@@ -186,7 +186,7 @@ Los roles `LOGIN` se crean sin contraseña. La provisión se hace con `\password
 | 1 | Creación de los cuatro roles de grupo y del rol técnico | R1.1, R1.3, R1.4 |
 | 2 | Creación de `app_web` y `admin_datos` con `PASSWORD NULL` y `CONNECTION LIMIT` | R1.2, R1.4, R1.5 |
 | 3 | `REVOKE ALL ON SCHEMA public FROM PUBLIC`; `USAGE` a los siete; `CREATE` temporal al técnico | R2.1, R2.2, R2.5 |
-| 4 | Revocación de `PUBLIC` sobre tablas, vistas, secuencias y `fn_autenticar` | R2.3, R2.4 |
+| 4 | Revocación de `PUBLIC` sobre tablas, vistas y secuencias (para `fn_autenticar`, ver 11.b) | R2.3, R2.4 |
 | 5 | `SELECT` de `rol_app_lectura` sobre las tres vistas | R3.1–R3.3 |
 | 6 | `EXECUTE` del procedimiento, `INSERT` por columna, `SELECT (id)` y secuencia de cliente | R4.1–R4.6 |
 | 7 | `REVOKE ALL` y `GRANT SELECT` por columna sobre `usuario` para soporte; vistas de pedidos | R5.1–R5.6 |
@@ -194,7 +194,7 @@ Los roles `LOGIN` se crean sin contraseña. La provisión se hace con `\password
 | 9 | Privilegios mínimos del rol técnico (columnas, secuencias, tipo, `pgcrypto`) | R9.5 |
 | 10 | Hardening y transferencia de `sp_registrar_pedido` | R9.1–R9.3 |
 | 11 | Creación, `REVOKE`, `GRANT` y transferencia de `fn_resetear_password` | R8.1–R8.10 |
-| 11.b | Hardening y transferencia de todas las sobrecargas de `fn_autenticar` | R9.4 |
+| 11.b | Hardening completo de todas las sobrecargas de `fn_autenticar` en un único bloque: `REVOKE` de `PUBLIC`, `EXECUTE` a `rol_app_lectura`, `SECURITY DEFINER`, `search_path` y dueño técnico | R2.4, R3.4, R9.4 |
 | 12 | DML explícito y privilegios por columna de `admin_datos` | R7.1–R7.7 |
 | 13 | Membresías de `app_web` | R1.6, R1.7 |
 | 14 | `ALTER DEFAULT PRIVILEGES` | R10.1–R10.5 |
