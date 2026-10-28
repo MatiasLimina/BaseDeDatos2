@@ -25,7 +25,10 @@ import sys
 SESION = re.compile(r' sesion=(\S+) ')
 USUARIO_DBA = re.compile(r' user=postgres ')
 MAIL = re.compile(r'[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}')
-RUTA = re.compile(r'[A-Za-z]:/[^"\s)]*?/pgdata(?=/)')
+# Directorio de cualquier ruta absoluta (Windows o Unix, con espacios) que
+# lleve a un archivo de configuración del servidor, sea cual sea el nombre
+# de la carpeta de datos: "C:/Users/<usuario>/.../pg_hba.conf" -> "<PGDATA>/pg_hba.conf".
+RUTA = re.compile(r'(?:[A-Za-z]:)?/[^"()\n]*?/(?=(?:pg_hba|pg_ident|postgresql(?:\.auto)?)\.conf)')
 
 
 def main(ruta_log, ruta_mapa):
@@ -59,7 +62,7 @@ def main(ruta_log, ruta_mapa):
         if sesion_actual in sesiones_dba:
             cuenta['lineas_dba'] += 1
             continue
-        linea, n = RUTA.subn('<PGDATA>', linea)
+        linea, n = RUTA.subn('<PGDATA>/', linea)
         cuenta['rutas'] += n
         salida.append(MAIL.sub(reemplazar_mail, linea))
 
