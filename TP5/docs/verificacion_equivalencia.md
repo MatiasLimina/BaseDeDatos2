@@ -21,7 +21,7 @@ Especificación de la agregación: cantidad de cuentas por rol y por mes de alta
 
 El mes de alta se calcula en `America/Argentina/Buenos_Aires`. `created_at` es `TIMESTAMPTZ`, así que un `date_trunc('month', created_at)` sin zona depende de la zona horaria de la sesión: una cuenta creada el 31 a las 22:00 en Argentina ya es día 1 en UTC y cambiaría de mes según quién ejecute la consulta.
 
-> **Sobre el uso de IA en este punto.** La consigna pide especificarle esta consulta a OpenCode. Se le envió la especificación (`gemini-3.5-flash`, en una carpeta aislada y sin acceso a la base), pero a los 10 minutos no había respondido, igual que en las demoras de la Parte A. El equipo decidió cancelar la consulta y escribir las dos consultas con Claude Code a partir de la misma especificación (ver `BITACORA.md`, D-1).
+> **Sobre el uso de IA en este punto.** La consigna pide especificarle esta consulta a OpenCode. Se le envió la especificación (`gemini-3.5-flash`, sesión `ses_e7c20665…`, en una carpeta aislada y sin acceso a la base). A los 10 minutos no había respuesta y el equipo decidió cancelar y escribir las dos consultas con Claude Code a partir de la misma especificación. Después se comprobó en el registro de la sesión que la causa no era la demora: el proveedor había rechazado el pedido con *"You exceeded your current quota"* (cuota agotada de la API de Google). Ver `BITACORA.md`, D-1.
 
 Sobre `usuario_anon`:
 
