@@ -1,0 +1,137 @@
+El paginador no se usará.
+=== 1. ATRIBUTOS DE LOS ROLES (LOGIN, SUPERUSER, CREATEROLE, etc.) ===
+      rolname      | puede_login | superuser | createdb | createrole | replication | bypassrls | connection_limit 
+-------------------+-------------+-----------+----------+------------+-------------+-----------+------------------
+ admin_datos       | t           | f         | f        | f          | f           | f         |                5
+ app_web           | t           | f         | f        | f          | f           | f         |               20
+ rol_app_escritura | f           | f         | f        | f          | f           | f         |               -1
+ rol_app_lectura   | f           | f         | f        | f          | f           | f         |               -1
+ rol_owner_codigo  | f           | f         | f        | f          | f           | f         |               -1
+ rol_reportes      | f           | f         | f        | f          | f           | f         |               -1
+ rol_soporte       | f           | f         | f        | f          | f           | f         |               -1
+(7 filas)
+
+=== 2. MEMBRESÍAS (quién hereda qué rol) ===
+   rol_otorgado    |      miembro      | con_admin_option | hereda_automaticamente 
+-------------------+-------------------+------------------+------------------------
+ rol_app_escritura | app_web           | f                | t
+ rol_app_lectura   | app_web           | f                | t
+ rol_app_lectura   | rol_app_escritura | f                | t
+(3 filas)
+
+=== 3. PRIVILEGIOS DIRECTOS DE TABLA/VISTA (information_schema) ===
+     grantee      | table_schema |      table_name       | privilege_type | is_grantable 
+------------------+--------------+-----------------------+----------------+--------------
+ admin_datos      | public       | categoria             | INSERT         | NO
+ admin_datos      | public       | categoria             | SELECT         | NO
+ admin_datos      | public       | categoria             | UPDATE         | NO
+ admin_datos      | public       | cliente               | INSERT         | NO
+ admin_datos      | public       | cliente               | SELECT         | NO
+ admin_datos      | public       | cliente               | UPDATE         | NO
+ admin_datos      | public       | pedido                | INSERT         | NO
+ admin_datos      | public       | pedido                | SELECT         | NO
+ admin_datos      | public       | pedido                | UPDATE         | NO
+ admin_datos      | public       | pedido_detalle        | INSERT         | NO
+ admin_datos      | public       | pedido_detalle        | SELECT         | NO
+ admin_datos      | public       | pedido_detalle        | UPDATE         | NO
+ admin_datos      | public       | producto              | INSERT         | NO
+ admin_datos      | public       | producto              | SELECT         | NO
+ admin_datos      | public       | producto              | UPDATE         | NO
+ admin_datos      | public       | vw_detalle_pedido     | SELECT         | NO
+ admin_datos      | public       | vw_pedidos_cliente    | SELECT         | NO
+ admin_datos      | public       | vw_productos_vigentes | SELECT         | NO
+ rol_app_lectura  | public       | vw_detalle_pedido     | SELECT         | NO
+ rol_app_lectura  | public       | vw_pedidos_cliente    | SELECT         | NO
+ rol_app_lectura  | public       | vw_productos_vigentes | SELECT         | NO
+ rol_owner_codigo | public       | producto              | UPDATE         | NO
+ rol_reportes     | public       | vw_detalle_pedido     | SELECT         | NO
+ rol_soporte      | public       | vw_detalle_pedido     | SELECT         | NO
+ rol_soporte      | public       | vw_pedidos_cliente    | SELECT         | NO
+(25 filas)
+
+=== 4. PRIVILEGIOS POR COLUMNA SOBRE usuario ===
+     grantee      | table_name | column_name | privilege_type | is_grantable 
+------------------+------------+-------------+----------------+--------------
+ admin_datos      | usuario    | activo      | INSERT         | NO
+ admin_datos      | usuario    | activo      | SELECT         | NO
+ admin_datos      | usuario    | activo      | UPDATE         | NO
+ admin_datos      | usuario    | apellido    | INSERT         | NO
+ admin_datos      | usuario    | apellido    | SELECT         | NO
+ admin_datos      | usuario    | apellido    | UPDATE         | NO
+ admin_datos      | usuario    | celular     | INSERT         | NO
+ admin_datos      | usuario    | celular     | SELECT         | NO
+ admin_datos      | usuario    | celular     | UPDATE         | NO
+ admin_datos      | usuario    | contrasena  | INSERT         | NO
+ admin_datos      | usuario    | created_at  | SELECT         | NO
+ admin_datos      | usuario    | id          | SELECT         | NO
+ admin_datos      | usuario    | mail        | INSERT         | NO
+ admin_datos      | usuario    | mail        | SELECT         | NO
+ admin_datos      | usuario    | mail        | UPDATE         | NO
+ admin_datos      | usuario    | nombre      | INSERT         | NO
+ admin_datos      | usuario    | nombre      | SELECT         | NO
+ admin_datos      | usuario    | nombre      | UPDATE         | NO
+ admin_datos      | usuario    | rol         | INSERT         | NO
+ admin_datos      | usuario    | rol         | SELECT         | NO
+ admin_datos      | usuario    | rol         | UPDATE         | NO
+ rol_owner_codigo | usuario    | activo      | SELECT         | NO
+ rol_owner_codigo | usuario    | contrasena  | SELECT         | NO
+ rol_owner_codigo | usuario    | contrasena  | UPDATE         | NO
+ rol_owner_codigo | usuario    | id          | SELECT         | NO
+ rol_owner_codigo | usuario    | mail        | SELECT         | NO
+ rol_owner_codigo | usuario    | rol         | SELECT         | NO
+ rol_soporte      | usuario    | activo      | SELECT         | NO
+ rol_soporte      | usuario    | apellido    | SELECT         | NO
+ rol_soporte      | usuario    | created_at  | SELECT         | NO
+ rol_soporte      | usuario    | id          | SELECT         | NO
+ rol_soporte      | usuario    | mail        | SELECT         | NO
+ rol_soporte      | usuario    | nombre      | SELECT         | NO
+ rol_soporte      | usuario    | rol         | SELECT         | NO
+(34 filas)
+
+=== 5. MATRIZ DE CHECKS CRÍTICOS (incluye herencia) ===
+ soporte_select_tabla_usuario | soporte_select_contrasena | soporte_select_mail | soporte_update_usuario | lectura_select_producto | lectura_select_vista | escritura_insert_pedido | escritura_update_pedido | escritura_delete_pedido | escritura_insert_email_cliente | escritura_returning_id_cliente | escritura_usage_seq_cliente | escritura_usage_seq_pedido | admin_delete_pedido | admin_select_contrasena | admin_update_contrasena | owner_codigo_select_contrasena | owner_codigo_select_tabla_usuario | reportes_select_mv | reportes_select_usuario | app_web_hereda_lectura | app_web_select_usuario 
+------------------------------+---------------------------+---------------------+------------------------+-------------------------+----------------------+-------------------------+-------------------------+-------------------------+--------------------------------+--------------------------------+-----------------------------+----------------------------+---------------------+-------------------------+-------------------------+--------------------------------+-----------------------------------+--------------------+-------------------------+------------------------+------------------------
+ f                            | f                         | t                   | f                      | f                       | t                    | f                       | f                       | f                       | t                              | t                              | t                           | f                          | f                   | f                       | f                       | t                              | f                                 | t                  | f                       | t                      | f
+(1 fila)
+
+=== 6. PROPIEDAD Y HARDENING DE RUTINAS ===
+ esquema |        rutina        |                                             argumentos                                              | security_definer |          configuracion          |   propietario    
+---------+----------------------+-----------------------------------------------------------------------------------------------------+------------------+---------------------------------+------------------
+ public  | fn_autenticar        | p_mail text, p_password text                                                                        | t                | {"search_path=public, pg_temp"} | rol_owner_codigo
+ public  | fn_resetear_password | p_usuario_id bigint, p_nueva text                                                                   | t                | {"search_path=public, pg_temp"} | rol_owner_codigo
+ public  | sp_registrar_pedido  | IN p_cliente_id bigint, IN p_forma_pago forma_pago_enum, IN p_items jsonb, INOUT p_pedido_id bigint | t                | {"search_path=public, pg_temp"} | rol_owner_codigo
+(3 filas)
+
+=== 6.b PRIVILEGIOS EFECTIVOS DE EJECUCIÓN DE RUTINAS ===
+      rolname      | fn_autenticar | fn_resetear_password | sp_registrar_pedido 
+-------------------+---------------+----------------------+---------------------
+ admin_datos       | f             | t                    | t
+ app_web           | t             | f                    | t
+ rol_app_escritura | t             | f                    | t
+ rol_app_lectura   | t             | f                    | f
+ rol_owner_codigo  | t             | t                    | t
+ rol_reportes      | f             | f                    | f
+ rol_soporte       | f             | t                    | f
+(7 filas)
+
+=== 7. PRIVILEGIOS POR OMISIÓN (objetos futuros) ===
+ propietario | esquema | tipo_objeto |          acl          
+-------------+---------+-------------+-----------------------
+ postgres    |         | T           | {postgres=U/postgres}
+ postgres    |         | f           | {postgres=X/postgres}
+(2 filas)
+
+=== 8. du (metacomando de psql; incluye todos los roles del clúster) ===
+                                   Lista de roles
+     Nombre de rol      |                         Atributos                         
+------------------------+-----------------------------------------------------------
+ admin_datos            | 5 conexiones
+ app_web                | 20 conexiones
+ postgres               | Superusuario, Crear rol, Crear BD, Replicación, Ignora RLS
+ rol_app_escritura      | No puede conectarse
+ rol_app_lectura        | No puede conectarse
+ rol_owner_codigo       | No puede conectarse
+ rol_reportes           | No puede conectarse
+ rol_reportes_foodstore | 
+ rol_soporte            | No puede conectarse
+
