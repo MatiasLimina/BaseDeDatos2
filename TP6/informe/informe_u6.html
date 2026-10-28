@@ -1,0 +1,112 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>Informe U6 - Food Store</title>
+<!-- Fuente de informe_u6.pdf. Se genera con TP6/informe/generar_pdf.sh (Chrome sin interfaz). -->
+<style>
+  @page { size: A4; margin: 11mm 13mm; }
+  * { box-sizing: border-box; }
+  body { font-family: "Segoe UI", Calibri, Arial, sans-serif; font-size: 8.6pt; line-height: 1.32;
+         color: #1d2633; margin: 0; }
+  header { border-bottom: 2px solid #2d5b80; padding-bottom: 3px; margin-bottom: 5px; }
+  h1 { font-size: 13pt; margin: 0; color: #1b3a57; }
+  .sub { color: #4b5a6b; font-size: 8pt; }
+  h2 { font-size: 9.4pt; color: #2d5b80; margin: 6px 0 2px; border-bottom: 1px solid #c9d6e2; }
+  p { margin: 2px 0; }
+  ul { margin: 2px 0; padding-left: 15px; }
+  li { margin: 1px 0; }
+  table { border-collapse: collapse; width: 100%; margin: 3px 0; font-size: 8.2pt; }
+  th, td { border: 1px solid #c9d6e2; padding: 1.5px 5px; text-align: left; vertical-align: top; }
+  th { background: #e8eff6; }
+  td.n { text-align: right; font-variant-numeric: tabular-nums; }
+  .cols { display: flex; gap: 10px; }
+  .cols > div { flex: 1; }
+  code { font-family: Consolas, monospace; font-size: 7.9pt; background: #f1f4f7; padding: 0 2px;
+         white-space: nowrap; }
+  .ok { color: #1f7a3a; font-weight: 600; }
+  .nota { color: #4b5a6b; font-size: 7.8pt; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Informe post-incidente — Simulacro de restauración de Food Store</h1>
+  <div class="sub">TP Unidad 6 · Bases de Datos II · Matias Limina - Nicolas Monjelardi - Lautaro Aguero ·
+    PostgreSQL 17.11, <code>localhost:5432</code> · 28/10/2026</div>
+</header>
+
+<div class="cols">
+<div>
+<h2>1. Respaldo utilizado</h2>
+<p>El último que se generó: <code>foodstore_20261028_181449.dump</code>. Es del <b>28/10/2026 a las 18:14:49</b>, pesa 3,7 MB, está en formato custom (<code>pg_dump -Fc</code>) y lo generó <code>backup_foodstore.ps1</code>. Junto con él quedaron los conteos de filas tomados justo antes de <code>pg_dump</code>.</p>
+
+<h2>2. Tiempo de restauración y validación</h2>
+<p>El simulacro empezó a las 18:57:38. El cronómetro arrancó inmediatamente antes de <code>createdb foodstore_restore_test</code> y paró cuando las validaciones terminaron bien.</p>
+<table>
+  <tr><th>Etapa</th><th>Tiempo</th></tr>
+  <tr><td><code>createdb</code></td><td class="n">1,1 s</td></tr>
+  <tr><td><code>pg_restore --no-owner --no-privileges</code></td><td class="n">11,5 s</td></tr>
+  <tr><td>Validaciones</td><td class="n">0,4 s</td></tr>
+  <tr><th>Total (RTO observado)</th><th class="n">13,0 s</th></tr>
+</table>
+<p class="nota">Después, fuera del cronómetro, se ejecutó <code>ANALYZE</code> (3,1 s), porque <code>pg_restore</code> no restaura las estadísticas del planificador.</p>
+</div>
+
+<div>
+<h2>3. RPO y RTO</h2>
+<p><b>RPO</b>: cuántos datos se pueden perder, medidos como la antigüedad del último respaldo. <b>RTO</b>: cuánto se tarda en volver a tener la base operativa y validada.</p>
+<table>
+  <tr><th></th><th>Previsto (laboratorio)</th><th>Observado</th></tr>
+  <tr><td><b>RPO</b></td><td>24 h (un respaldo diario)</td><td class="n"><b>42 min 49 s</b></td></tr>
+  <tr><td><b>RTO</b></td><td>10 min</td><td class="n"><b>13,0 s</b></td></tr>
+</table>
+<p>El RPO observado es bajo porque el respaldo era reciente, no porque el plan lo garantice. Con un respaldo diario, el peor caso se acerca a 24 h. Para bajarlo hacen falta respaldos más frecuentes o archivado de WAL. El RTO quedó muy por debajo del objetivo. Con 100 MB, el 88 % del tiempo lo usa <code>pg_restore</code> para recrear índices y restricciones.</p>
+</div>
+</div>
+
+<h2>4. Validaciones sobre <code>foodstore_restore_test</code></h2>
+<table>
+  <tr><th>Control</th><th>categoria</th><th>cliente</th><th>producto</th><th>pedido</th><th>pedido_detalle</th>
+      <th>Productos inválidos</th><th>Detalles inválidos</th></tr>
+  <tr><td>Antes del respaldo</td><td class="n">3</td><td class="n">20 003</td><td class="n">50 005</td>
+      <td class="n">200 001</td><td class="n">621 853</td><td class="n">0</td><td class="n">0</td></tr>
+  <tr><td>Restaurado</td><td class="n">3</td><td class="n">20 003</td><td class="n">50 005</td>
+      <td class="n">200 001</td><td class="n">621 853</td><td class="n">0</td><td class="n">0</td></tr>
+</table>
+<p><span class="ok">7/7 OK.</span> La consigna valida <code>detalle_pedido</code>; en el esquema la tabla es <code>pedido_detalle</code>. También coinciden los objetos de las dos bases: tablas, vistas, funciones, triggers, índices (12) y restricciones (16). <code>foodstore</code> no se tocó: tenía el mismo OID y los mismos conteos antes y después.</p>
+
+<div class="cols">
+<div>
+<h2>5. Problema real encontrado</h2>
+<p><b>La vista materializada de la base principal estaba desactualizada.</b> En <code>foodstore_restore_test</code>, <code>mv_facturacion_categoria_mes</code> tiene 13 filas; en <code>foodstore</code>, 1. El respaldo no guarda su contenido: guarda un <code>REFRESH</code> que <code>pg_restore</code> ejecuta, así que la copia se recalculó con los datos actuales. En <code>foodstore</code> la vista se había creado antes de cargar los 200 000 pedidos y nunca se refrescó, así que sus reportes muestran datos viejos.</p>
+<p class="nota">Otros problemas encontrados al probar los scripts:</p>
+<ul class="nota">
+  <li>El respaldo y el chequeo de salud podían quedar colgados ante un bloqueo de otra sesión. Se les puso un límite de espera (<code>lock_timeout</code>, <code>--lock-wait-timeout</code>).</li>
+  <li>Las tablas chicas nunca se analizaban: para <code>categoria</code>, el planificador estimaba 360 filas en lugar de 3.</li>
+</ul>
+</div>
+<div>
+<h2>6. Mejora concreta</h2>
+<p>Agregar al plan semanal, antes del respaldo, <code>REFRESH MATERIALIZED VIEW CONCURRENTLY mv_facturacion_categoria_mes</code>, que no bloquea las lecturas. El índice único que exige ya existe. También conviene sumar a la validación de la restauración la comparación del contenido de la vista. Así el respaldo y la base principal muestran lo mismo, y una diferencia como la de este simulacro se detecta en el control semanal y no en un incidente.</p>
+<p class="nota">Para una base más grande, el siguiente ajuste de tiempo sería <code>pg_restore -j</code> (restauración en paralelo).</p>
+</div>
+</div>
+
+<h2>7. Trabajo asistido por IA y cómo se verificó</h2>
+<p>La consigna sugiere OpenCode. El equipo usó <b>Claude Code</b> en la terminal del repositorio para todo el TP: la SPEC, los cuatro scripts, las pruebas y la evidencia. Ningún resultado se aceptó sin ejecutarlo:</p>
+<ul>
+  <li><b>Pruebas manuales:</b> cada script se ejecutó a mano en sus casos de éxito y de error (base inexistente, sin credencial, bloqueos, respaldo truncado, conteos distintos).</li>
+  <li><b>Tests en bases descartables:</b> <code>test_maintenance.sh</code> sobre <code>foodstore_maint_test</code> y <code>test_restore.sh</code> sobre una base canario, escritos antes que los scripts. Se comprobaron con mutaciones: cambios deliberados en el código que el test debía detectar.</li>
+  <li><b>Revisión antes de cada commit:</b> un agente revisor de solo lectura revisó el diff.</li>
+</ul>
+<p>Así se detectaron y corrigieron defectos de la IA, entre ellos:</p>
+<ul>
+  <li><code>$PSScriptRoot</code> vacío en PowerShell 5.1;</li>
+  <li>acentos desfigurados en el log;</li>
+  <li>chequeos que se colgaban detrás de un bloqueo;</li>
+  <li>un control de destino que no distinguía mayúsculas;</li>
+  <li>un test que usaba <code>foodstore</code> como destino de prueba.</li>
+</ul>
+<p>El detalle está en <code>BITACORA.md</code> y <code>evidencias/</code>. No se versionan contraseñas: la clave sale de <code>pgpass.conf</code> y los clientes se invocan con <code>-w</code>.</p>
+</body>
+</html>
