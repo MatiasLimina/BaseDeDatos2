@@ -360,8 +360,9 @@ BEGIN
     -- la contraseña de una cuenta ADMIN. El reset de administradores
     -- queda reservado al DBA. Si el dominio usa otra etiqueta para el
     -- rol administrador, ajustar el literal 'ADMIN'.
+    -- pgcrypto con esquema explícito: defensa adicional al search_path fijo.
     UPDATE public.usuario
-       SET contrasena = crypt(p_nueva, gen_salt('bf'))
+       SET contrasena = public.crypt(p_nueva, public.gen_salt('bf'))
      WHERE id = p_usuario_id
        AND activo = TRUE
        AND rol::text <> 'ADMIN';

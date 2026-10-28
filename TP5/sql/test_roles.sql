@@ -97,6 +97,25 @@ BEGIN
 END
 $$;
 
+-- Las rutinas elevadas llaman a pgcrypto con el esquema explícito
+-- (auditoría A.4, propuesta 7): no dependen solo del search_path.
+DO $$
+DECLARE
+    v_def TEXT;
+BEGIN
+    FOREACH v_def IN ARRAY ARRAY[
+        pg_get_functiondef('public.fn_resetear_password(bigint,text)'::regprocedure),
+        pg_get_functiondef('public.fn_autenticar(text,text)'::regprocedure)
+    ]
+    LOOP
+        ASSERT v_def !~ '(?<![.\w])crypt\(',
+            'las rutinas deben invocar public.crypt, no crypt sin esquema';
+        ASSERT v_def !~ '(?<![.\w])gen_salt\(',
+            'las rutinas deben invocar public.gen_salt, no gen_salt sin esquema';
+    END LOOP;
+END
+$$;
+
 -- ---------------------------------------------------------------------
 -- 3. Regresión — lo que ya cumplía la primera versión
 -- ---------------------------------------------------------------------
