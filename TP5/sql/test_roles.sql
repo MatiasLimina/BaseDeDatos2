@@ -134,6 +134,43 @@ BEGIN
 END
 $$;
 
+-- fn_autenticar deja en el log del servidor cada intento con su resultado
+-- (Clase 1: auditar los inicios de sesión fallidos), nunca la clave, y
+-- neutraliza los caracteres de control del mail para que no se puedan
+-- falsificar líneas del log. Requiere logging_collector (auditoria_config.sql).
+DO $$
+DECLARE
+    v_marca  TEXT := 'test' || to_char(clock_timestamp(), 'HH24MISSUS');
+    v_clave  TEXT := 'ClaveQueNoDebeLoguearse' || v_marca;
+    v_log    TEXT;
+    v_inicio BIGINT;
+BEGIN
+    v_inicio := (pg_stat_file(pg_current_logfile())).size;
+
+    PERFORM public.fn_autenticar(v_marca || '@foodstore.test', v_clave);
+    PERFORM public.fn_autenticar('cuenta2@foodstore.test', 'FoodStore#2');
+    PERFORM public.fn_autenticar(v_marca || E'\nFATAL:  falsa@foodstore.test', 'x');
+    PERFORM pg_sleep(0.5);   -- el collector escribe de forma asíncrona
+
+    v_log := pg_read_file(pg_current_logfile(), v_inicio,
+                          (pg_stat_file(pg_current_logfile())).size - v_inicio);
+
+    ASSERT v_log ~ ('fn_autenticar: intento fallido mail=' || v_marca || '@foodstore\.test'),
+        'fn_autenticar debe registrar el intento fallido con el mail';
+    ASSERT v_log ~ 'fn_autenticar: inicio de sesión exitoso usuario_id=2 ',
+        'fn_autenticar debe registrar el inicio de sesión exitoso';
+    ASSERT position(v_clave IN v_log) = 0,
+        'la clave probada nunca debe llegar al log';
+    -- PostgreSQL ya sangra las líneas de continuación con un tabulador,
+    -- pero un parser ingenuo (grep "FATAL") las tomaría igual: el mail
+    -- tiene que quedar en una sola línea, con el control reemplazado.
+    ASSERT v_log ~ (v_marca || '\?FATAL:  falsa@'),
+        'el salto de línea del mail debe registrarse reemplazado por ?';
+    ASSERT v_log !~ (v_marca || E'\\n'),
+        'un salto de línea en el mail no debe partir la línea del log';
+END
+$$;
+
 -- Soporte resetea cuentas comunes pero no ADMIN, y no lee el hash.
 DO $$
 BEGIN

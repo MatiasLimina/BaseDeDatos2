@@ -95,22 +95,47 @@ ON CONFLICT (mail) DO NOTHING;
 -- Devuelve la cuenta autenticada o ninguna fila. No distingue "mail
 -- inexistente" de "clave incorrecta" para no permitir enumerar cuentas.
 -- La comparación usa el hash guardado como sal: crypt(clave, hash) = hash.
+--
+-- Auditoría (Clase 1: "debe auditarse: intentos fallidos de login"):
+-- cada intento queda en el log del servidor con RAISE LOG, que no llega
+-- al cliente. Con log_statement = 'mod' un SELECT no se registra, así que
+-- sin esto un ataque de fuerza bruta contra la aplicación sería invisible.
+--   * Nunca se registra la clave probada.
+--   * El mail lo escribe el atacante: se reemplazan los caracteres de
+--     control y se corta a 120 caracteres para que no pueda inyectar
+--     líneas falsas en el log.
+--   * El mail es un dato personal: el log debe tratarse como sensible
+--     (docs/informe_auditoria.md §4).
+-- Si cambia esta función, volver a ejecutar roles.sql: CREATE OR REPLACE
+-- la deja SECURITY INVOKER hasta que roles.sql la endurece de nuevo.
 CREATE OR REPLACE FUNCTION public.fn_autenticar(
     p_mail TEXT,
     p_password TEXT
 )
 RETURNS TABLE (usuario_id BIGINT, rol rol_usuario_enum)
-LANGUAGE sql
+LANGUAGE plpgsql
 STABLE
 SET search_path = public, pg_temp
 AS $$
-    SELECT u.id, u.rol
-    FROM public.usuario u
-    WHERE u.mail = lower(btrim(p_mail))
-      AND u.activo
-      AND u.contrasena IS NOT NULL
-      AND u.contrasena = public.crypt(p_password, u.contrasena);
+DECLARE
+    v_mail_log TEXT := left(regexp_replace(coalesce(p_mail, ''), '[[:cntrl:]]', '?', 'g'), 120);
+BEGIN
+    RETURN QUERY
+        SELECT u.id, u.rol
+        FROM public.usuario u
+        WHERE u.mail = lower(btrim(p_mail))
+          AND u.activo
+          AND u.contrasena IS NOT NULL
+          AND u.contrasena = public.crypt(p_password, u.contrasena);
+
+    IF FOUND THEN
+        RAISE LOG 'fn_autenticar: inicio de sesión exitoso usuario_id=% mail=%',
+            (SELECT u.id FROM public.usuario u WHERE u.mail = lower(btrim(p_mail))), v_mail_log;
+    ELSE
+        RAISE LOG 'fn_autenticar: intento fallido mail=%', v_mail_log;
+    END IF;
+END;
 $$;
 
 COMMENT ON FUNCTION public.fn_autenticar(TEXT, TEXT) IS
-    'Autenticación por mail y clave. Sin SQL dinámico. roles.sql la pasa a SECURITY DEFINER con dueño rol_owner_codigo.';
+    'Autenticación por mail y clave, sin SQL dinámico. Registra cada intento en el log (sin la clave). roles.sql la pasa a SECURITY DEFINER con dueño rol_owner_codigo.';
