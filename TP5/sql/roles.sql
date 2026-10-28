@@ -11,6 +11,7 @@
 --      pedido, pedido_detalle, usuario, las tres vistas, la vista
 --      materializada mv_facturacion_categoria_mes y los procedimientos
 --      sp_registrar_pedido / fn_autenticar / fn_resetear_password.
+--      usuario y fn_autenticar se crean con sql/usuario_autenticacion.sql.
 --   3. La extensión pgcrypto debe estar disponible (hash bcrypt).
 --   4. Las contraseñas de los roles LOGIN NO se versionan: se crean
 --      con PASSWORD NULL y se provisionan con \password o con un
@@ -285,7 +286,16 @@ GRANT INSERT (pedido_id, producto_id, cantidad, precio_unitario, subtotal)
 GRANT USAGE ON SEQUENCE public.pedido_id_seq TO rol_owner_codigo;
 GRANT USAGE ON TYPE public.forma_pago_enum TO rol_owner_codigo;
 
--- Funciones de pgcrypto usadas por fn_resetear_password.
+-- Funciones de pgcrypto usadas por fn_autenticar y fn_resetear_password.
+-- La extensión las crea con EXECUTE para PUBLIC: cualquier rol podía
+-- fabricar hashes bcrypt de una clave conocida (riesgo R10). Se cierran
+-- y solo las ejecuta el rol técnico, dentro de las rutinas.
+REVOKE EXECUTE ON FUNCTION
+    public.crypt(TEXT, TEXT),
+    public.gen_salt(TEXT),
+    public.gen_salt(TEXT, INTEGER)
+FROM PUBLIC;
+
 GRANT EXECUTE ON FUNCTION public.crypt(TEXT, TEXT) TO rol_owner_codigo;
 GRANT EXECUTE ON FUNCTION public.gen_salt(TEXT) TO rol_owner_codigo;
 
@@ -323,7 +333,7 @@ ALTER PROCEDURE public.sp_registrar_pedido(BIGINT, forma_pago_enum, JSONB, BIGIN
 --     del rol que la invoca.
 --   * SET search_path = public, pg_temp: evita el ataque de suplantación
 --     de esquema (schema shadowing) vía pg_temp u otros esquemas.
---   * REVOKE ALL FROM PUBLIC + GRANT EXECUTE solo a rol_soporte/admin.
+--   * REVOKE ALL FROM PUBLIC + GRANT EXECUTE solo a rol_soporte.
 --   * El propietario solo puede leer id/activo y actualizar contrasena:
 --     no puede leer el hash.
 CREATE OR REPLACE FUNCTION public.fn_resetear_password(
@@ -368,8 +378,11 @@ $$;
 
 REVOKE ALL ON FUNCTION public.fn_resetear_password(BIGINT, TEXT) FROM PUBLIC;
 
+-- Solo soporte. admin_datos no la recibe: combinada con UPDATE (rol)
+-- permitía degradar un ADMIN, resetearle la clave y volver a promoverlo
+-- (riesgo R2, verificado en docs/verificacion_permisos.md §5.5).
 GRANT EXECUTE ON FUNCTION public.fn_resetear_password(BIGINT, TEXT)
-    TO rol_soporte, admin_datos;
+    TO rol_soporte;
 
 ALTER FUNCTION public.fn_resetear_password(BIGINT, TEXT)
     OWNER TO rol_owner_codigo;
@@ -418,15 +431,19 @@ GRANT SELECT, INSERT, UPDATE ON TABLE
 TO admin_datos;
 
 -- En usuario se aplica también mínimo privilegio por columna:
--- admin_datos administra identidades pero no lee ni actualiza el hash.
--- El cambio de contraseña se hace con fn_resetear_password.
+-- admin_datos administra los datos personales de las cuentas y su baja
+-- lógica, pero no toca credenciales ni el rol de negocio (riesgo R2):
+--   * Las altas nacen con rol = 'USUARIO' (DEFAULT) y contrasena NULL;
+--     soporte las activa con fn_resetear_password.
+--   * La promoción a ADMIN y el reset de cuentas ADMIN quedan para el DBA.
+-- Puede leer rol para saber qué cuentas son administradoras.
 GRANT SELECT (id, nombre, apellido, mail, celular, rol, activo, created_at)
     ON TABLE public.usuario TO admin_datos;
 
-GRANT INSERT (nombre, apellido, mail, celular, contrasena, rol, activo)
+GRANT INSERT (nombre, apellido, mail, celular, activo)
     ON TABLE public.usuario TO admin_datos;
 
-GRANT UPDATE (nombre, apellido, mail, celular, rol, activo)
+GRANT UPDATE (nombre, apellido, mail, celular, activo)
     ON TABLE public.usuario TO admin_datos;
 
 -- Secuencias de las tablas que admin_datos inserta directamente.
@@ -516,7 +533,7 @@ COMMENT ON ROLE rol_owner_codigo IS
 COMMENT ON ROLE app_web IS
     'LOGIN de la aplicación: hereda rol_app_lectura y rol_app_escritura. Sin atributos administrativos.';
 COMMENT ON ROLE admin_datos IS
-    'LOGIN de administración de datos: DML explícito sin DELETE, sin DDL y sin lectura de hashes.';
+    'LOGIN de administración de datos: DML explícito sin DELETE ni DDL; en usuario no escribe contrasena ni rol.';
 
 DO $$
 BEGIN

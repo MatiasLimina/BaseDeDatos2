@@ -160,15 +160,16 @@ El diseño parte de una premisa: **ninguna credencial de conexión debe ser due�
 #### Criterios de Aceptación
 
 1. THE `Sistema_Roles` SHALL otorgar `SELECT`, `INSERT` y `UPDATE` —sin `DELETE`, `TRUNCATE`, `REFERENCES` ni `TRIGGER`— sobre `categoria`, `producto`, `cliente`, `pedido` y `pedido_detalle` a `admin_datos`.
-2. THE `Sistema_Roles` SHALL otorgar sobre `usuario` exactamente `SELECT (id, nombre, apellido, mail, celular, rol, activo, created_at)`, `INSERT (nombre, apellido, mail, celular, contrasena, rol, activo)` y `UPDATE (nombre, apellido, mail, celular, rol, activo)` a `admin_datos`.
-3. THE `Sistema_Roles` SHALL NO otorgar `SELECT` ni `UPDATE` sobre `usuario.contrasena` a `admin_datos`; el cambio de contraseña se realiza con `fn_resetear_password`.
+2. THE `Sistema_Roles` SHALL otorgar sobre `usuario` exactamente `SELECT (id, nombre, apellido, mail, celular, rol, activo, created_at)`, `INSERT (nombre, apellido, mail, celular, activo)` y `UPDATE (nombre, apellido, mail, celular, activo)` a `admin_datos`.
+3. THE `Sistema_Roles` SHALL NO otorgar ningún privilegio sobre `usuario.contrasena` a `admin_datos`, ni `INSERT`/`UPDATE` sobre `usuario.rol`: las altas nacen con `rol = 'USUARIO'` y sin credencial, y la promoción a `ADMIN` queda reservada al DBA (corrección del riesgo R2).
 4. THE `Sistema_Roles` SHALL otorgar `USAGE, SELECT` sobre `categoria_id_seq`, `producto_id_seq`, `cliente_id_seq`, `pedido_id_seq` y `usuario_id_seq` a `admin_datos`.
 5. THE `Sistema_Roles` SHALL otorgar `SELECT` sobre las tres vistas y la vista materializada a `admin_datos`.
-6. THE `Sistema_Roles` SHALL otorgar `EXECUTE` sobre `sp_registrar_pedido` y `fn_resetear_password` a `admin_datos`.
+6. THE `Sistema_Roles` SHALL otorgar `EXECUTE` sobre `sp_registrar_pedido` a `admin_datos` y SHALL NO otorgarle `EXECUTE` sobre `fn_resetear_password`.
 7. THE `Sistema_Roles` SHALL NO otorgar `CREATE ON SCHEMA public`, `CREATEDB`, `CREATEROLE` ni `SUPERUSER` a `admin_datos`.
 8. WHEN `admin_datos` ejecuta `DELETE FROM pedido`, THE PostgreSQL SHALL responder con error de permisos.
 9. WHEN `admin_datos` ejecuta `SELECT contrasena FROM usuario`, THE PostgreSQL SHALL responder con error de permisos.
 10. WHEN `admin_datos` ejecuta `UPDATE usuario SET contrasena = ...`, THE PostgreSQL SHALL responder con error de permisos.
+11. WHEN `admin_datos` ejecuta `UPDATE usuario SET rol = ...` o invoca `fn_resetear_password`, THE PostgreSQL SHALL responder con error de permisos.
 
 ---
 
@@ -180,9 +181,10 @@ El diseño parte de una premisa: **ninguna credencial de conexión debe ser due�
 
 1. THE `Sistema_Roles` SHALL crear o reemplazar `fn_resetear_password(p_usuario_id BIGINT, p_nueva TEXT)` con `RETURNS VOID`, `LANGUAGE plpgsql`, `SECURITY DEFINER` y `SET search_path = public, pg_temp`.
 2. THE `Sistema_Roles` SHALL ejecutar `REVOKE ALL ON FUNCTION public.fn_resetear_password(BIGINT, TEXT) FROM PUBLIC`.
-3. THE `Sistema_Roles` SHALL otorgar `EXECUTE` sobre `fn_resetear_password` a `rol_soporte` y `admin_datos`.
+3. THE `Sistema_Roles` SHALL otorgar `EXECUTE` sobre `fn_resetear_password` únicamente a `rol_soporte`.
 4. THE `Sistema_Roles` SHALL transferir la propiedad de `fn_resetear_password` a `rol_owner_codigo`.
 5. THE `Sistema_Roles` SHALL otorgar a `rol_owner_codigo` únicamente `SELECT (id, activo)` y `UPDATE (contrasena)` sobre `usuario`, además de `EXECUTE` sobre `crypt(TEXT, TEXT)` y `gen_salt(TEXT)`.
+5.b THE `Sistema_Roles` SHALL revocar `EXECUTE` de `PUBLIC` sobre `crypt` y `gen_salt`, de modo que ningún rol de negocio pueda fabricar hashes bcrypt (corrección del riesgo R10).
 6. WHEN `rol_soporte` invoca `fn_resetear_password` sobre un usuario activo con rol distinto de `ADMIN`, THE función SHALL actualizar `contrasena` con `crypt(p_nueva, gen_salt('bf'))`.
 7. IF `p_usuario_id` es nulo, THEN THE función SHALL lanzar una excepción.
 8. IF `p_nueva` es nula o vacía, THEN THE función SHALL lanzar una excepción.

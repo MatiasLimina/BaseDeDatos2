@@ -46,7 +46,7 @@ El resultado son **siete roles**: cuatro de grupo, uno técnico de propiedad y d
 | `rol_reportes` | Grupo `NOLOGIN` | `SELECT` sobre `mv_facturacion_categoria_mes` y `vw_detalle_pedido`. | No recibe `vw_pedidos_cliente`, tablas base ni escritura. |
 | `rol_owner_codigo` | Técnico `NOLOGIN` | Propiedad de las tres rutinas `SECURITY DEFINER` y solo las columnas/objetos que éstas usan. | No inicia sesión, no tiene membresías, no puede `CREATE` al finalizar. |
 | `app_web` | `LOGIN` | Hereda `rol_app_lectura` y `rol_app_escritura`. | Sin atributos administrativos ni membresía en soporte/reportes/admin. |
-| `admin_datos` | `LOGIN` | `SELECT/INSERT/UPDATE` explícito sobre tablas de negocio; por columna en `usuario`; `EXECUTE` sobre las rutinas. | Sin `DELETE`, `TRUNCATE`, DDL, `CREATEROLE` ni lectura/actualización del hash. |
+| `admin_datos` | `LOGIN` | `SELECT/INSERT/UPDATE` explícito sobre tablas de negocio; por columna en `usuario` (datos personales y baja lógica); `EXECUTE` sobre `sp_registrar_pedido`. | Sin `DELETE`, `TRUNCATE`, DDL ni `CREATEROLE`; no toca `contrasena`, no escribe `rol` y no resetea claves. |
 
 ### 2.3 Atributos comunes
 
@@ -65,13 +65,14 @@ Leyenda: **S** = `SELECT`, **I** = `INSERT`, **U** = `UPDATE`, **D** = `DELETE`,
 | `cliente` | — | I(cols) + S(id) | — | — | S(id, activo) | I(cols) + S(id) | S, I, U |
 | `pedido` | — | — | — | — | S(id) + I(cols) | — | S, I, U |
 | `pedido_detalle` | — | — | — | — | I(cols) | — | S, I, U |
-| `usuario` | — | — | S(cols) sin `contrasena` | — | S(cols) + U(`contrasena`) | — | S/I/U(cols) sin leer ni actualizar `contrasena` |
+| `usuario` | — | — | S(cols) sin `contrasena` | — | S(cols) + U(`contrasena`) | — | S/I/U(cols) sin `contrasena`; `rol` solo lectura |
 | `vw_productos_vigentes` | S | S (hereda) | — | — | — | S | S |
 | `vw_pedidos_cliente` | S | S (hereda) | S | — | — | S | S |
 | `vw_detalle_pedido` | S | S (hereda) | S | S | — | S | S |
 | `mv_facturacion_categoria_mes` | — | — | — | S | — | — | S |
 | `fn_autenticar(...)` | X | X (hereda) | — | — | dueño | X | — |
-| `fn_resetear_password(...)` | — | — | X | — | dueño | — | X |
+| `fn_resetear_password(...)` | — | — | X | — | dueño | — | — |
+| `crypt` / `gen_salt` (pgcrypto) | — | — | — | — | X | — | — |
 | `sp_registrar_pedido(...)` | — | X | — | — | dueño | X | X |
 | Secuencias | — | `USAGE cliente_id_seq` | — | — | `USAGE pedido_id_seq` | `USAGE cliente_id_seq` | `USAGE, SELECT` en las cinco |
 | Tipo `forma_pago_enum` | — | — | — | — | `USAGE` | — | — |
@@ -85,7 +86,7 @@ Leyenda: **S** = `SELECT`, **I** = `INSERT`, **U** = `UPDATE`, **D** = `DELETE`,
 |---|---|---|---|
 | `rol_soporte` | `id, nombre, apellido, mail, rol, activo, created_at` | — | — |
 | `rol_owner_codigo` | `id, mail, contrasena, rol, activo` | — | `contrasena` |
-| `admin_datos` | `id, nombre, apellido, mail, celular, rol, activo, created_at` | `nombre, apellido, mail, celular, contrasena, rol, activo` | `nombre, apellido, mail, celular, rol, activo` |
+| `admin_datos` | `id, nombre, apellido, mail, celular, rol, activo, created_at` | `nombre, apellido, mail, celular, activo` | `nombre, apellido, mail, celular, activo` |
 
 `contrasena` nunca es legible por `rol_soporte`, `admin_datos` ni `app_web`. El único rol con `SELECT (contrasena)` es `rol_owner_codigo`, porque `fn_autenticar` compara el hash; es `NOLOGIN` y no puede consultarlo de forma interactiva.
 
@@ -121,8 +122,8 @@ GRANT SELECT (id, nombre, apellido, mail, rol, activo, created_at)
 La función se define con:
 
 - `SECURITY DEFINER` y `SET search_path = public, pg_temp`, para que el cuerpo no pueda ser secuestrado por objetos de `pg_temp` u otro esquema.
-- `REVOKE ALL ... FROM PUBLIC` y `GRANT EXECUTE` solo a `rol_soporte` y `admin_datos`.
-- Propietario `rol_owner_codigo`, que solo tiene `SELECT (id, activo)` y `UPDATE (contrasena)` sobre `usuario`, más `EXECUTE` sobre `crypt` y `gen_salt`.
+- `REVOKE ALL ... FROM PUBLIC` y `GRANT EXECUTE` solo a `rol_soporte`.
+- Propietario `rol_owner_codigo`, que solo tiene `SELECT (id, activo)` y `UPDATE (contrasena)` sobre `usuario`, más `EXECUTE` sobre `crypt` y `gen_salt` (revocadas de `PUBLIC`).
 - Validaciones de `p_usuario_id` nulo, `p_nueva` nula/vacía y usuario inexistente o inactivo.
 - **Bloqueo de cuentas `ADMIN`:** `AND rol::text <> 'ADMIN'`. Sin esta condición, soporte podría resetear la clave del administrador y escalar verticalmente.
 
@@ -140,9 +141,9 @@ Si `sp_registrar_pedido` o `fn_autenticar` quedaran en propiedad del DBA superus
 
 ### D6 — `admin_datos` sin `DELETE`, sin DDL y sin hash
 
-La baja de Food Store es lógica (`activo = FALSE`), por lo que `DELETE` y `TRUNCATE` no forman parte de la operación normal. `admin_datos` recibe `SELECT, INSERT, UPDATE` explícitos (nunca `GRANT ALL`), sin `REFERENCES`, `TRIGGER` ni `CREATE ON SCHEMA`. Sobre `usuario`, el `GRANT` es por columna: puede crear un usuario con `contrasena` inicial, pero no puede leer ni actualizar el hash; el cambio de clave pasa por `fn_resetear_password`.
+La baja de Food Store es lógica (`activo = FALSE`), por lo que `DELETE` y `TRUNCATE` no forman parte de la operación normal. `admin_datos` recibe `SELECT, INSERT, UPDATE` explícitos (nunca `GRANT ALL`), sin `REFERENCES`, `TRIGGER` ni `CREATE ON SCHEMA`. Sobre `usuario`, el `GRANT` es por columna y deja afuera `contrasena` y la escritura de `rol`: un alta nace con `rol = 'USUARIO'` (DEFAULT) y `contrasena = NULL` (cuenta pendiente de activación), y soporte la activa con `fn_resetear_password`.
 
-**Riesgo residual:** puede insertar o modificar la columna `rol`, incluido `ADMIN`. Se documenta en §7 y se recomienda una política de segregación de funciones o un trigger de auditoría.
+**Por qué (segregación de funciones):** la primera versión le daba `INSERT/UPDATE (rol)`, `INSERT (contrasena)` y `EXECUTE fn_resetear_password`. Combinados permitían degradar un `ADMIN`, resetearle la clave y volver a promoverlo (escalamiento vertical verificado, ex riesgo R2). Ahora quien administra datos no gestiona credenciales, quien gestiona credenciales (soporte) no cambia roles, y la promoción a `ADMIN` queda reservada al DBA.
 
 ### D7 — `ALTER DEFAULT PRIVILEGES` sin grants automáticos
 
@@ -264,6 +265,10 @@ Además de la matriz, se ejecutaron pruebas con `SET ROLE`:
 | `admin_datos`: `DELETE FROM pedido` | `permission denied` |
 | `admin_datos`: `SELECT contrasena FROM usuario` | `permission denied` |
 | `admin_datos`: `UPDATE usuario SET contrasena = ...` | `permission denied` |
+| `admin_datos`: `UPDATE usuario SET rol = ...` | `permission denied` (corta la cadena del ex R2) |
+| `admin_datos`: `SELECT fn_resetear_password(...)` | `permission denied for function` |
+| `admin_datos`: `INSERT INTO usuario (nombre, apellido, mail)` | OK; nace `rol = 'USUARIO'`, `contrasena = NULL` |
+| `app_web`: `SELECT * FROM fn_autenticar(mail, clave)` | OK con la clave correcta; 0 filas con una incorrecta |
 | `rol_reportes`: `SELECT * FROM mv_facturacion_categoria_mes` | OK |
 | `rol_reportes`: `SELECT * FROM usuario` | `permission denied` |
 | `rol_owner_codigo`: `CREATE TABLE` | `permission denied for schema public` |
@@ -275,7 +280,7 @@ Además de la matriz, se ejecutaron pruebas con `SET ROLE`:
 | # | Riesgo | Impacto | Mitigación actual | Recomendación |
 |---|---|---|---|---|
 | R1 | **Acceso horizontal**: ningún rol tiene RLS; `rol_soporte` y `admin_datos` ven todas las filas de `usuario`. | Un agente de soporte ve datos de todos los clientes. | Permisos por columna y por vista. | Evaluar `ROW LEVEL SECURITY` por sucursal/equipo si el dominio lo requiere. |
-| R2 | **`admin_datos` puede crear usuarios `ADMIN` o cambiar `rol`** (`INSERT`/`UPDATE` de `rol`). Cadena verificada: degradar un `ADMIN` a `USUARIO`, resetear su clave con `fn_resetear_password`, volver a promoverlo y autenticarse con la clave conocida. | Escalamiento vertical desde una credencial de administración de datos. | Sin `CREATEROLE`, sin DDL y sin lectura del hash; el guard de `fn_resetear_password` protege frente a `rol_soporte`, pero no frente a `admin_datos`, que puede cambiar `rol` antes y después. | Separar la gestión de identidades en otro rol, auditar los cambios de `rol` con un trigger, o quitar `UPDATE (rol)` y `EXECUTE fn_resetear_password` de `admin_datos`. |
+| R2 | **CORREGIDO.** La primera versión dejaba que `admin_datos` creara usuarios `ADMIN` o cambiara `rol`. Cadena verificada: degradar un `ADMIN` a `USUARIO`, resetear su clave con `fn_resetear_password`, volver a promoverlo y autenticarse con la clave conocida. | Escalamiento vertical desde una credencial de administración de datos. | `admin_datos` ya no tiene `INSERT/UPDATE (rol)`, `INSERT (contrasena)` ni `EXECUTE fn_resetear_password` (D6). `sql/test_roles.sql` prueba que la cadena se corta en el primer paso. | Pendiente para la Parte B: auditar los cambios de `usuario.rol`, que solo hace el DBA. |
 | R3 | **`rol_owner_codigo` puede leer hashes** porque `fn_autenticar` los compara. | Si otra rutina maliciosa se le asigna como propietaria, podría exfiltrarlos. | `NOLOGIN`, sin membresías, sin `CREATE`, `search_path` fijo. | Migrar la verificación de hash a la aplicación o usar un rol técnico por rutina. |
 | R4 | **`FOR UPDATE` exige `UPDATE` de tabla sobre `producto`** para el rol técnico. | El propietario técnico podría actualizar cualquier columna de `producto` si se le inyectara código. | Solo actúa dentro del procedimiento; sin `LOGIN`. | Aceptado: PostgreSQL no permite `FOR UPDATE` con privilegio por columna. |
 | R5 | **Roles de clúster, no de base**: `DROP ROLE` falla si otra base usa el mismo nombre. | El script no es portable a un clúster compartido sin limpieza por base. | `REASSIGN`/`DROP OWNED` en la base actual. | Usar un clúster dedicado o ejecutar la limpieza en cada base. |
@@ -283,7 +288,7 @@ Además de la matriz, se ejecutaron pruebas con `SET ROLE`:
 | R7 | **`admin_datos` puede leer todos los datos de negocio**, incluidos los personales de `cliente`. | Exposición masiva si la credencial se compromete. | Sin `DELETE`, sin DDL, sin hash, `CONNECTION LIMIT 5`. | Monitorear `log_statement`, aplicar RLS y revisar periódicamente los `GRANT`. |
 | R8 | **La política de `ALTER DEFAULT PRIVILEGES` depende del dueño que ejecuta el script.** | Si otro rol crea tablas, no hereda la política. | Se usa `CURRENT_USER`. | Repetir el bloque para cada rol que cree objetos, o centralizar el DDL en un único dueño. |
 | R9 | **Los `GRANT` por columna no cubren `SELECT *`** y pueden sorprender a un desarrollador. | Una consulta nueva con `*` falla en producción. | Documentado y verificado. | Usar listas explícitas de columnas en el código de la aplicación. |
-| R10 | **`crypt` y `gen_salt` de pgcrypto siguen siendo ejecutables por `PUBLIC`**; `admin_datos`, `rol_soporte` y `app_web` pueden generar hashes. | No permite escritura por sí solo, pero facilita que `admin_datos` cree un usuario `ADMIN` con una clave conocida. | El script no toca los privilegios de las funciones de la extensión. | Revocar `EXECUTE` de `PUBLIC` sobre `crypt`/`gen_salt` y otorgarlo solo a `rol_owner_codigo` y al DBA, verificando que no rompa otras rutinas. |
+| R10 | **CORREGIDO.** `crypt` y `gen_salt` de pgcrypto eran ejecutables por `PUBLIC`; cualquier rol podía generar hashes bcrypt. | Facilitaba que `admin_datos` creara un usuario `ADMIN` con una clave conocida. | `roles.sql` §9 revoca `EXECUTE` de `PUBLIC` y lo otorga solo a `rol_owner_codigo`; `fn_autenticar` y `fn_resetear_password` siguen funcionando porque corren como ese dueño (bloque 6.c de la verificación). | Repetir el `REVOKE` si se reinstala o actualiza la extensión. |
 
 ---
 
