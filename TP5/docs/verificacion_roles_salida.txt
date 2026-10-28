@@ -61,7 +61,6 @@ El paginador no se usará.
  admin_datos      | usuario    | celular     | INSERT         | NO
  admin_datos      | usuario    | celular     | SELECT         | NO
  admin_datos      | usuario    | celular     | UPDATE         | NO
- admin_datos      | usuario    | contrasena  | INSERT         | NO
  admin_datos      | usuario    | created_at  | SELECT         | NO
  admin_datos      | usuario    | id          | SELECT         | NO
  admin_datos      | usuario    | mail        | INSERT         | NO
@@ -70,9 +69,7 @@ El paginador no se usará.
  admin_datos      | usuario    | nombre      | INSERT         | NO
  admin_datos      | usuario    | nombre      | SELECT         | NO
  admin_datos      | usuario    | nombre      | UPDATE         | NO
- admin_datos      | usuario    | rol         | INSERT         | NO
  admin_datos      | usuario    | rol         | SELECT         | NO
- admin_datos      | usuario    | rol         | UPDATE         | NO
  rol_owner_codigo | usuario    | activo      | SELECT         | NO
  rol_owner_codigo | usuario    | contrasena  | SELECT         | NO
  rol_owner_codigo | usuario    | contrasena  | UPDATE         | NO
@@ -86,7 +83,7 @@ El paginador no se usará.
  rol_soporte      | usuario    | mail        | SELECT         | NO
  rol_soporte      | usuario    | nombre      | SELECT         | NO
  rol_soporte      | usuario    | rol         | SELECT         | NO
-(34 filas)
+(31 filas)
 
 === 5. MATRIZ DE CHECKS CRÍTICOS (incluye herencia) ===
  soporte_select_tabla_usuario | soporte_select_contrasena | soporte_select_mail | soporte_update_usuario | lectura_select_producto | lectura_select_vista | escritura_insert_pedido | escritura_update_pedido | escritura_delete_pedido | escritura_insert_email_cliente | escritura_returning_id_cliente | escritura_usage_seq_cliente | escritura_usage_seq_pedido | admin_delete_pedido | admin_select_contrasena | admin_update_contrasena | owner_codigo_select_contrasena | owner_codigo_select_tabla_usuario | reportes_select_mv | reportes_select_usuario | app_web_hereda_lectura | app_web_select_usuario 
@@ -105,13 +102,25 @@ El paginador no se usará.
 === 6.b PRIVILEGIOS EFECTIVOS DE EJECUCIÓN DE RUTINAS ===
       rolname      | fn_autenticar | fn_resetear_password | sp_registrar_pedido 
 -------------------+---------------+----------------------+---------------------
- admin_datos       | f             | t                    | t
+ admin_datos       | f             | f                    | t
  app_web           | t             | f                    | t
  rol_app_escritura | t             | f                    | t
  rol_app_lectura   | t             | f                    | f
  rol_owner_codigo  | t             | t                    | t
  rol_reportes      | f             | f                    | f
  rol_soporte       | f             | t                    | f
+(7 filas)
+
+=== 6.c FUNCIONES DE pgcrypto (riesgo R10: no abiertas a PUBLIC) ===
+      rolname      | crypt | gen_salt 
+-------------------+-------+----------
+ admin_datos       | f     | f
+ app_web           | f     | f
+ rol_app_escritura | f     | f
+ rol_app_lectura   | f     | f
+ rol_owner_codigo  | t     | t
+ rol_reportes      | f     | f
+ rol_soporte       | f     | f
 (7 filas)
 
 === 7. PRIVILEGIOS POR OMISIÓN (objetos futuros) ===

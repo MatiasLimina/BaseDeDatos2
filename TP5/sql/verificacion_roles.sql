@@ -164,6 +164,20 @@ WHERE r.rolname IN (
 )
 ORDER BY r.rolname;
 
+\echo '=== 6.c FUNCIONES DE pgcrypto (riesgo R10: no abiertas a PUBLIC) ==='
+SELECT
+    r.rolname,
+    has_function_privilege(r.rolname, 'public.crypt(text,text)', 'EXECUTE')
+        AS crypt,
+    has_function_privilege(r.rolname, 'public.gen_salt(text)', 'EXECUTE')
+        AS gen_salt
+FROM pg_roles r
+WHERE r.rolname IN (
+    'rol_app_lectura', 'rol_app_escritura', 'rol_soporte', 'rol_reportes',
+    'rol_owner_codigo', 'app_web', 'admin_datos'
+)
+ORDER BY r.rolname;
+
 \echo '=== 7. PRIVILEGIOS POR OMISIÓN (objetos futuros) ==='
 SELECT
     pg_get_userbyid(d.defaclrole) AS propietario,

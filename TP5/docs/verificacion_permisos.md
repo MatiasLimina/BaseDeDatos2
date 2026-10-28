@@ -10,18 +10,21 @@ Este informe demuestra que el esquema creado por `TP5/sql/roles.sql` otorga **ex
 |---|---|
 | Motor | PostgreSQL 17 (compatible con el mínimo exigido: 16+) |
 | Clúster | Aislado, puerto `55432`, autenticación `trust` |
-| Base | `foodstore_fresh` |
-| Esquema | `public` con las tablas de Food Store, las tres vistas, la vista materializada y las rutinas de TP4 |
+| Base | `foodstore_tp5` |
+| Esquema | `public` armado con `Proyecto_Integrador/database/` (`schema`, `seed`, `procedures`, `views`, `indices_parciales_soft_delete`, `materializadas`, `generar_registros_adaptado`, `triggers`) más `TP5/sql/usuario_autenticacion.sql` |
 | Script aplicado | `TP5/sql/roles.sql` (dos ejecuciones consecutivas para probar idempotencia) |
 | Script de auditoría | `TP5/sql/verificacion_roles.sql` |
+| Pruebas de regresión | `TP5/sql/test_roles.sql` (termina con `test_roles: OK`) |
 
 La salida se capturó con:
 
 ```bash
-psql -h localhost -p 55432 -U postgres -d foodstore_fresh \
+psql -h localhost -p 55432 -U postgres -d foodstore_tp5 \
      -v ON_ERROR_STOP=1 -f TP5/sql/verificacion_roles.sql \
-     > verificacion_fresh.txt 2>&1
+     > TP5/docs/verificacion_roles_salida.txt 2>&1
 ```
+
+> **Recaptura (corrección de R2 y R10):** esta salida reemplaza a la primera captura (base `foodstore_fresh`), hecha antes de corregir los riesgos R2 y R10. Respecto de aquella, desaparecen las filas `admin_datos | usuario | contrasena | INSERT`, `rol | INSERT` y `rol | UPDATE` del bloque 4, `fn_resetear_password` pasa a `f` para `admin_datos` en el bloque 6.b y se agrega el bloque 6.c. La consola de Windows desfigura dos mensajes propios de psql (`usará`, `Replicación`), que se corrigieron a mano; los datos que devuelve el servidor no se tocaron.
 
 > **Nota:** la captura se hizo sobre un clúster de prueba aislado, no sobre la base de desarrollo del equipo. Los valores de datos cambian; los privilegios y atributos no. La salida se conserva completa para que cualquier persona pueda reproducirla con el mismo script.
 
@@ -169,7 +172,6 @@ El paginador no se usará.
  admin_datos      | usuario    | celular     | INSERT         | NO
  admin_datos      | usuario    | celular     | SELECT         | NO
  admin_datos      | usuario    | celular     | UPDATE         | NO
- admin_datos      | usuario    | contrasena  | INSERT         | NO
  admin_datos      | usuario    | created_at  | SELECT         | NO
  admin_datos      | usuario    | id          | SELECT         | NO
  admin_datos      | usuario    | mail        | INSERT         | NO
@@ -178,9 +180,7 @@ El paginador no se usará.
  admin_datos      | usuario    | nombre      | INSERT         | NO
  admin_datos      | usuario    | nombre      | SELECT         | NO
  admin_datos      | usuario    | nombre      | UPDATE         | NO
- admin_datos      | usuario    | rol         | INSERT         | NO
  admin_datos      | usuario    | rol         | SELECT         | NO
- admin_datos      | usuario    | rol         | UPDATE         | NO
  rol_owner_codigo | usuario    | activo      | SELECT         | NO
  rol_owner_codigo | usuario    | contrasena  | SELECT         | NO
  rol_owner_codigo | usuario    | contrasena  | UPDATE         | NO
@@ -194,7 +194,7 @@ El paginador no se usará.
  rol_soporte      | usuario    | mail        | SELECT         | NO
  rol_soporte      | usuario    | nombre      | SELECT         | NO
  rol_soporte      | usuario    | rol         | SELECT         | NO
-(34 filas)
+(31 filas)
 
 === 5. MATRIZ DE CHECKS CRÍTICOS (incluye herencia) ===
  soporte_select_tabla_usuario | soporte_select_contrasena | soporte_select_mail | soporte_update_usuario | lectura_select_producto | lectura_select_vista | escritura_insert_pedido | escritura_update_pedido | escritura_delete_pedido | escritura_insert_email_cliente | escritura_returning_id_cliente | escritura_usage_seq_cliente | escritura_usage_seq_pedido | admin_delete_pedido | admin_select_contrasena | admin_update_contrasena | owner_codigo_select_contrasena | owner_codigo_select_tabla_usuario | reportes_select_mv | reportes_select_usuario | app_web_hereda_lectura | app_web_select_usuario 
@@ -213,13 +213,25 @@ El paginador no se usará.
 === 6.b PRIVILEGIOS EFECTIVOS DE EJECUCIÓN DE RUTINAS ===
       rolname      | fn_autenticar | fn_resetear_password | sp_registrar_pedido 
 -------------------+---------------+----------------------+---------------------
- admin_datos       | f             | t                    | t
+ admin_datos       | f             | f                    | t
  app_web           | t             | f                    | t
  rol_app_escritura | t             | f                    | t
  rol_app_lectura   | t             | f                    | f
  rol_owner_codigo  | t             | t                    | t
  rol_reportes      | f             | f                    | f
  rol_soporte       | f             | t                    | f
+(7 filas)
+
+=== 6.c FUNCIONES DE pgcrypto (riesgo R10: no abiertas a PUBLIC) ===
+      rolname      | crypt | gen_salt 
+-------------------+-------+----------
+ admin_datos       | f     | f
+ app_web           | f     | f
+ rol_app_escritura | f     | f
+ rol_app_lectura   | f     | f
+ rol_owner_codigo  | t     | t
+ rol_reportes      | f     | f
+ rol_soporte       | f     | f
 (7 filas)
 
 === 7. PRIVILEGIOS POR OMISIÓN (objetos futuros) ===
@@ -251,7 +263,7 @@ El paginador no se usará.
 - **Atributos (bloque 1):** los cuatro roles de grupo y el técnico tienen `puede_login = f`; solo `app_web` y `admin_datos` tienen `t`. Ningún rol tiene `superuser`, `createdb`, `createrole`, `replication` ni `bypassrls`. Los límites de conexión son 20 y 5.
 - **Membresías (bloque 2):** solo existen tres: `app_web → rol_app_escritura`, `app_web → rol_app_lectura` y `rol_app_escritura → rol_app_lectura`. Ninguna tiene `admin_option`. `rol_owner_codigo` no tiene membresías.
 - **Privilegios directos (bloque 3):** `rol_app_lectura` solo aparece sobre las tres vistas; `rol_reportes` aparece solo por `vw_detalle_pedido` (su `SELECT` sobre la vista materializada no lo muestra `information_schema`; se verifica en el bloque 5); `admin_datos` tiene `SELECT/INSERT/UPDATE` en tablas de negocio, **sin `DELETE`**. No hay `GRANT ALL`.
-- **Permiso por columna (bloque 4):** `rol_soporte` tiene `SELECT` sobre `id, nombre, apellido, mail, rol, activo, created_at`, y **ninguna** fila para `contrasena`. `admin_datos` tiene `INSERT (contrasena)` pero no `SELECT` ni `UPDATE` sobre esa columna.
+- **Permiso por columna (bloque 4):** `rol_soporte` tiene `SELECT` sobre `id, nombre, apellido, mail, rol, activo, created_at`, y **ninguna** fila para `contrasena`. `admin_datos` no tiene ninguna fila para `contrasena` y sobre `rol` solo tiene `SELECT`.
 - **Matriz efectiva (bloque 5):** los 22 checks coinciden con la especificación. En particular:
   - `soporte_select_contrasena = false`
   - `soporte_select_mail = true`
@@ -264,7 +276,8 @@ El paginador no se usará.
   - `reportes_select_usuario = false`
   - `app_web_select_usuario = false`
 - **Rutinas (bloque 6):** las tres tienen `security_definer = t`, `configuracion = {"search_path=public, pg_temp"}` y propietario `rol_owner_codigo`. Ninguna corre como superusuario.
-- **Privilegios de ejecución (bloque 6.b):** `fn_autenticar` solo para `rol_app_lectura`, `rol_app_escritura`, `app_web` y el dueño; `fn_resetear_password` solo para `rol_soporte`, `admin_datos` y el dueño; `sp_registrar_pedido` solo para `rol_app_escritura`, `app_web`, `admin_datos` y el dueño. `rol_reportes` no ejecuta ninguna rutina.
+- **Privilegios de ejecución (bloque 6.b):** `fn_autenticar` solo para `rol_app_lectura`, `rol_app_escritura`, `app_web` y el dueño; `fn_resetear_password` solo para `rol_soporte` y el dueño; `sp_registrar_pedido` solo para `rol_app_escritura`, `app_web`, `admin_datos` y el dueño. `rol_reportes` no ejecuta ninguna rutina.
+- **pgcrypto (bloque 6.c):** `crypt` y `gen_salt` solo son ejecutables por `rol_owner_codigo`; ningún rol de negocio puede fabricar hashes.
 - **Objetos futuros (bloque 7):** `pg_default_acl` registra la política para funciones (`f`) y tipos (`T`) del rol `postgres`, sin `EXECUTE` ni `USAGE` para `PUBLIC`.
 - **`\du` (bloque 8):** confirma visualmente que los roles de grupo y el técnico son `NOLOGIN`, y que los dos de conexión no tienen atributos administrativos.
 
@@ -291,11 +304,11 @@ La ausencia de filas para tablas/secuencias **no** significa que la política no
 
 El bloque 5 muestra `owner_codigo_select_contrasena = true`. **Es intencional y está justificado:** `fn_autenticar` necesita comparar `contrasena = crypt(p_password, contrasena)`. El rol es `NOLOGIN`, no tiene membresías, no puede `CREATE` y solo es propietario de las rutinas; no puede consultar el hash de forma interactiva. Aun así, se registra como riesgo residual R3 en el diseño: si se le asignara la propiedad de una rutina maliciosa, podría exfiltrar hashes. La mitigación recomendada es mover la verificación a la aplicación o usar un rol técnico por rutina.
 
-### 5.5 El guard de `ADMIN` protege a soporte, pero no a `admin_datos`
+### 5.5 Hallazgo corregido (R2): el guard de `ADMIN` no protegía frente a `admin_datos`
 
 `fn_resetear_password` rechaza resetear una cuenta con `rol = 'ADMIN'`. Eso impide que `rol_soporte` escale verticalmente, porque soporte no tiene `UPDATE` sobre `usuario.rol`.
 
-`admin_datos`, en cambio, sí tiene `UPDATE (rol)`. La cadena siguiente se verificó en el clúster de prueba dentro de una transacción revertida:
+En la **primera versión** de `roles.sql`, `admin_datos` sí tenía `UPDATE (rol)`. La cadena siguiente se verificó en el clúster de prueba dentro de una transacción revertida:
 
 ```sql
 BEGIN;
@@ -307,7 +320,17 @@ RESET ROLE;
 ROLLBACK;
 ```
 
-Resultado: `UPDATE 1`, función ejecutada, `UPDATE 1`. Es un **escalamiento vertical real** desde la credencial de administración de datos. No es un defecto de `fn_resetear_password` sino una consecuencia de combinar `UPDATE (rol)` con `EXECUTE` sobre la función. Se registra como riesgo R2 en `design.md` §7; la mitigación recomendada es separar la gestión de identidades en otro rol o auditar los cambios de `rol`.
+Resultado: `UPDATE 1`, función ejecutada, `UPDATE 1`. Es un **escalamiento vertical real** desde la credencial de administración de datos. No es un defecto de `fn_resetear_password` sino una consecuencia de combinar `UPDATE (rol)` con `EXECUTE` sobre la función.
+
+**Corrección aplicada:** se le quitaron a `admin_datos` `INSERT/UPDATE (rol)`, `INSERT (contrasena)` y `EXECUTE` sobre `fn_resetear_password` (decisión D6 del diseño: segregación de funciones). La misma cadena, re-ejecutada sobre `foodstore_tp5`, se corta en el primer paso:
+
+```text
+UPDATE usuario SET rol = 'USUARIO' WHERE id = 1;       -> ERROR:  permission denied for table usuario
+SELECT fn_resetear_password(1, 'ClaveConocida2026!');   -> ERROR:  permission denied for function fn_resetear_password
+INSERT INTO usuario (..., contrasena, rol) VALUES (..., 'ADMIN') -> ERROR:  permission denied for table usuario
+```
+
+`TP5/sql/test_roles.sql` deja esta comprobación como prueba de regresión.
 
 ### 5.6 Hallazgo: `rol_reportes_foodstore` de TP3
 
@@ -321,9 +344,9 @@ Es un hallazgo de seguridad, no un error de `roles.sql`:
 
 **Acción recomendada:** `DROP ROLE rol_reportes_foodstore` en cada base donde exista, o —si se necesita conservar la credencial— rotar la clave con `\password` y migrar su uso a `rol_reportes`.
 
-### 5.7 `crypt` y `gen_salt` siguen abiertas a `PUBLIC`
+### 5.7 Hallazgo corregido (R10): `crypt` y `gen_salt` abiertas a `PUBLIC`
 
-La consulta:
+En la primera versión, la consulta:
 
 ```sql
 SELECT
@@ -336,7 +359,7 @@ devuelve `t | t | t`. Las funciones de `pgcrypto` se crearon con `EXECUTE` para 
 
 **Impacto:** no otorga escritura por sí solo, pero `admin_datos` ya tiene `INSERT (contrasena, rol)`; con `crypt` puede generar el hash de una clave conocida y crear una cuenta `ADMIN` sin depender de un hash precalculado. Se registra como R10 en `design.md` §7.
 
-**Mitigación recomendada:** `REVOKE EXECUTE ON FUNCTION public.crypt(text,text), public.gen_salt(text) FROM PUBLIC;` y otorgar solo a `rol_owner_codigo` y al DBA, después de verificar que ninguna otra rutina dependa del privilegio global.
+**Corrección aplicada:** `roles.sql` §9 ejecuta `REVOKE EXECUTE ... FROM PUBLIC` sobre `crypt(text,text)`, `gen_salt(text)` y `gen_salt(text,integer)`, y las otorga solo a `rol_owner_codigo`. El bloque 6.c muestra `f | f` para todos los roles de negocio y `t | t` para el dueño técnico. `fn_autenticar` y `fn_resetear_password` siguen funcionando porque corren como ese dueño (`SECURITY DEFINER`); `test_roles.sql` lo comprueba autenticando como `app_web` y reseteando como `rol_soporte`.
 
 ## 6. Pruebas de comportamiento (runtime)
 
@@ -362,6 +385,13 @@ La matriz de catálogo se complementó con pruebas de ejecución con `SET ROLE`.
 | `rol_reportes` | `SELECT * FROM mv_facturacion_categoria_mes` | OK |
 | `rol_reportes` | `SELECT * FROM usuario` | `ERROR: permission denied for table usuario` |
 | `rol_owner_codigo` | `CREATE TABLE t (id int)` | `ERROR: permission denied for schema public` |
+| `admin_datos` | `UPDATE usuario SET rol = 'USUARIO' WHERE id = 1` | `ERROR: permission denied for table usuario` |
+| `admin_datos` | `SELECT fn_resetear_password(1, '...')` | `ERROR: permission denied for function fn_resetear_password` |
+| `admin_datos` | `INSERT INTO usuario (nombre, apellido, mail) VALUES (...)` | OK; la cuenta nace `rol = 'USUARIO'` y `contrasena = NULL` |
+| `app_web` | `SELECT * FROM fn_autenticar('cuenta2@foodstore.test', <clave correcta>)` | 1 fila (`2`, `USUARIO`) |
+| `app_web` | `SELECT * FROM fn_autenticar('cuenta2@foodstore.test', 'incorrecta')` | 0 filas |
+
+Las filas agregadas (corrección de R2 y R10) se ejecutan automáticamente en `TP5/sql/test_roles.sql`.
 
 ## 7. Idempotencia
 
@@ -384,5 +414,6 @@ El esquema cumple la especificación:
 - **Caso obligatorio de permiso por columna** implementado y verificado: `rol_soporte` no puede leer `usuario.contrasena`, y `SELECT *` falla.
 - **`fn_resetear_password`** es `SECURITY DEFINER`, con `search_path` fijo, `REVOKE ALL FROM PUBLIC`, propietario no superusuario y bloqueo de cuentas `ADMIN`.
 - **`ALTER DEFAULT PRIVILEGES`** impide que funciones y tipos futuros nazcan con privilegios para `PUBLIC` y no otorga nada automáticamente a los roles de negocio.
+- **Hallazgos de la verificación corregidos:** el escalamiento de `admin_datos` (R2, §5.5) y `crypt`/`gen_salt` abiertas a `PUBLIC` (R10, §5.7).
 
-Los riesgos residuales (RLS horizontal, `admin_datos` puede asignar `rol = 'ADMIN'`, `rol_owner_codigo` puede leer hashes para autenticar, `FOR UPDATE` exige `UPDATE` de tabla) están documentados en `design.md` §7 con su mitigación y recomendación.
+Los riesgos residuales (RLS horizontal, `rol_owner_codigo` puede leer hashes para autenticar, `FOR UPDATE` exige `UPDATE` de tabla, el rol heredado `rol_reportes_foodstore` de TP3) están documentados en `design.md` §7 con su mitigación y recomendación.
