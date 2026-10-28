@@ -50,4 +50,30 @@ En esta parte no se usó OpenCode: todo el trabajo se hizo con *Claude Code*. Se
 
 ## Parte E — Cierre
 
-*(pendiente: caso más significativo de error de la IA y revisión del historial de Git)*
+### E.1 Consolidación
+
+| Parte | Registros | Herramientas | Casos en que la IA propuso algo incorrecto, inseguro o de más |
+|---|---|---|---|
+| A — Roles y permisos | A-0a a A-5 | OpenCode (Gemini, DeepSeek), Claude Code | **A-0b:** DeepSeek le otorgó a `admin_datos` más de lo pedido y dejó a sabiendas un escalamiento a ADMIN. **A-4:** la captura de evidencia salió con texto desfigurado. **A-5:** Gemini propuso un permiso "por si acaso" (`gen_salt(TEXT, INTEGER)`) y dos cambios con premisas falsas. |
+| B — Auditoría | B-1 a B-3 | Claude Code | **B-2:** cuatro defectos en el script de prueba (variables de psql dentro de `$$` y de `\!`, la regla de replicación de `pg_hba` y la suposición de que el script seguía después de un `\connect` fallido). |
+| C — Simulacro | C-1 a C-4 | OpenCode (Gemini), Claude Code | **C-2:** fuga de claves al log y un test trivial. **C-3:** Gemini invirtió causa y consecuencia y afirmó lo que el log no puede ver. **C-4:** recomendación de revisar `pg_stat_statements`, que no estaba instalada. |
+| D — Anonimización | D-1, D-2 | OpenCode (sin respuesta: cuota agotada), Claude Code | Ninguno detectado. Las consultas y la anonimización se validaron con mutaciones. |
+
+Evidencia literal de las sesiones de OpenCode: `docs/ia/opencode_parte_a_generacion.md`, `docs/ia/opencode_auditoria_roles.md` y `docs/ia/opencode_reconstruccion_incidente.md`.
+
+### E.2 El caso más significativo: la fuga de claves al log (C-2)
+
+Para que el simulacro de la Parte C fuera visible con `log_statement = 'mod'`, la IA (Claude Code) hizo que `fn_autenticar` registrara cada intento con `RAISE LOG`. Escribió un test que leía el log del servidor y verificaba que la clave **no** apareciera, y el test dio verde. Sin embargo, en el log del servidor el nivel LOG supera `log_min_error_statement`, así que PostgreSQL agregaba a cada registro una línea `STATEMENT:` con la sentencia completa. Las seis claves que probó el atacante, **incluida la correcta**, quedaron en texto plano. El test no lo veía porque construía la clave por concatenación dentro del bloque `DO`, de modo que nunca aparecía literal en la sentencia registrada: verificaba lo que el código intentaba hacer, no lo que el servidor escribía de verdad.
+
+Se detectó al leer el fragmento crudo del log antes de anonimizarlo, como paso previo obligatorio a entregárselo a otra IA. De haberse saltado esa lectura, las credenciales habrían viajado a un proveedor externo, justo lo que la Parte C enseña a evitar. La corrección (`RAISE WARNING`, que no arrastra la sentencia, sin dar privilegios nuevos) vino acompañada de un test que usa la clave como literal y que falla si vuelve a aparecer.
+
+El aprendizaje es doble. Un test que pasa no prueba nada si no ejercita el caso real. Y el control humano que más valor aportó no fue revisar el código, sino mirar la evidencia que el sistema produjo.
+
+### E.3 Revisión del historial de Git
+
+El historial del TP5 (28 commits, `90c49de` a `0faf47e`) refleja el avance por partes, con mensajes descriptivos en el formato de los TP anteriores (`feat`/`fix`/`docs`/`refactor(tp5): ...`) y commits atómicos: cada script se commiteó junto con su test, y cada corrección por separado del material que corrige, para que el hallazgo y su solución se vean en el historial. Aun así, hay cosas que haríamos distinto:
+
+- **El trabajo inicial no se commiteó mientras se hacía.** La especificación y la primera versión de `roles.sql` se generaron con DeepSeek el 26/10, pero recién se commitearon el 28/10, en cuatro commits del mismo minuto. El historial no muestra cuándo se produjo cada cosa. La próxima vez: un commit apenas termina cada sesión de IA, aunque el resultado tenga defectos conocidos.
+- **La Parte A se reabrió después de su "cierre"** (`a1cdb7d` → `1d80648` a `6580516`) para completar la auditoría con OpenCode. Habría sido más claro no dar por cerrada una parte mientras quedaran registros pendientes en la bitácora.
+- **Los cambios a `fn_autenticar` de la Parte C** (`9efc458`, `bf5edf0`) tocan un archivo de la Parte A, y `9efc458` dejó en el historial un estado con la fuga de claves. Es correcto que el error quede visible, pero un test que leyera la sentencia literal desde el primer commit lo habría evitado.
+- **Un push se hizo sin pedido explícito** (Parte D). La regla del equipo es hacer push solo cuando se decide.
