@@ -49,6 +49,15 @@ for f in "$REQ" "$DES" "$TSK"; do
   fi
 done
 
+# 2e. Informe y documentos de IA: nada de que PostgreSQL bloquee o descuente el stock al
+# sincronizar (el TP8 no sincroniza de verdad). Patron mas acotado que 2d porque estos
+# textos tienen negaciones correctas como "no descuenta stock ni hace venta".
+for f in "$RAIZ/informe/informe.html" "$DUIA" "$BIT" "$RAIZ/docs/code_review_ia.md" "$RAIZ/docs/plan_mantenimiento_tp8.md"; do
+  if grep -i -E -q "bloquea PostgreSQL|bloqueo at[oó]mico|at[oó]mica(mente)?.{0,60}PostgreSQL|PostgreSQL.{0,40}at[oó]mica|al sincronizar" "$f"; then
+    falla "$(basename "$f") dice que PostgreSQL bloquea o descuenta el stock al sincronizar"
+  fi
+done
+
 # 3. Bitacora de IA: al menos 3 entradas y al menos un descarte
 [ -f "$BIT" ] || falla "docs/bitacora_ia.md no existe"
 n_entradas=$(grep -E -c "^\| [0-9]+ \|" "$BIT" || true)
