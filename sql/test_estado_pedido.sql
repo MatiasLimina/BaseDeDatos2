@@ -31,9 +31,13 @@ BEGIN
         RAISE EXCEPTION 'pedido.estado debe ser NOT NULL DEFAULT ''PENDIENTE''';
     END IF;
 
-    -- 3. La regla de asignación se cumple en todos los pedidos.
+    -- 3. La carga inicial siguió la regla en todos los pedidos del lote original
+    --    (id <= 200001). Verifica esa carga, no un invariante: si después un pedido
+    --    cambia de estado legítimamente (por ejemplo, de ENVIADO a ENTREGADO), este
+    --    control falla y hay que actualizarlo.
     SELECT count(*) INTO n FROM pedido
-     WHERE estado <> CASE
+     WHERE id <= 200001
+       AND estado <> CASE
              WHEN fecha >= corte - interval '12 hours' THEN 'PENDIENTE'
              WHEN fecha >= corte - interval '1 day'    THEN 'EN_PREPARACION'
              WHEN fecha >= corte - interval '3 days'   THEN 'ENVIADO'
