@@ -13,6 +13,7 @@ La base relacional es la `foodstore` del proyecto integrador. Ver el repositorio
 | Previo | Estado del pedido agregado a `foodstore` (la consigna lo pide y el modelo no lo tenía) | [`sql/00_estado_pedido.sql`](sql/00_estado_pedido.sql), [`sql/test_estado_pedido.sql`](sql/test_estado_pedido.sql) |
 | 1 | Modelo documental, migración y reglas de integridad | [`docs/modelo_documental.md`](docs/modelo_documental.md), [`sql/01_seleccion_pedidos.sql`](sql/01_seleccion_pedidos.sql), [`migracion/generar_insert_pedidos.sql`](migracion/generar_insert_pedidos.sql), [`mongodb/01_crear_coleccion.js`](mongodb/01_crear_coleccion.js), [`mongodb/02_insert_pedidos.js`](mongodb/02_insert_pedidos.js), [`tests/test_migracion.sh`](tests/test_migracion.sh) |
 | 2 | Consultas en los dos motores y tabla de verificación | [`consultas_mongodb.js`](consultas_mongodb.js), [`consultas_postgresql.sql`](consultas_postgresql.sql), [`docs/consultas_verificacion.md`](docs/consultas_verificacion.md), [`tests/test_consultas.sh`](tests/test_consultas.sh) |
+| 3 | Consulta a una IA aislada, contraste de dos afirmaciones y conclusión | [`docs/ia/consulta_ia.md`](docs/ia/consulta_ia.md), [`docs/contraste_ia.md`](docs/contraste_ia.md), [`evidencias/parte3_contraste_mongodb.txt`](evidencias/parte3_contraste_mongodb.txt), [`evidencias/parte3_lectura_pedido_completo.txt`](evidencias/parte3_lectura_pedido_completo.txt) |
 
 Evidencias en [`evidencias/`](evidencias/).
 

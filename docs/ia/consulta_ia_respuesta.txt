@@ -1,0 +1,76 @@
+Respuesta literal del agente de IA aislado (Claude Sonnet), 01/11/2026. Prompt en consulta_ia.md.
+-----------------------------------------------------------------------------------------------
+
+## Recomendación: combinar tecnologías (PostgreSQL como sistema de registro transaccional; MongoDB, si hace falta, como vista de lectura derivada). Si el volumen no lo exige, mantener solo PostgreSQL.
+
+### PostgreSQL
+**Ventajas**
+- **Integridad declarativa.** El motor aplica FK, CHECK (cantidad > 0, precios ≥ 0), UNIQUE (email) y PK compuesta (pedido_id, producto_id). Ninguna aplicación puede saltearlas.
+- **Transacciones ACID multi-tabla.** Crear el pedido, descontar stock y registrar las líneas es atómico, con aislamiento fuerte (SELECT ... FOR UPDATE, SERIALIZABLE).
+- **Coherencia económica garantizable en la base.** Se puede declarar `subtotal` como columna generada (`GENERATED ALWAYS AS (cantidad * precio_unitario) STORED`) o con CHECK `subtotal = cantidad * precio_unitario`. El total del pedido se mantiene con un trigger o se calcula con una vista (`SUM(subtotal)`), de modo que no hay un total duplicado que pueda divergir.
+- **Consultas analíticas.** Los JOIN y GROUP BY (ventas por categoría, por cliente, por período) son nativos y optimizables.
+- **Datos compartidos sin duplicar.** Producto y cliente viven en un solo lugar.
+
+**Desventajas**
+- Leer un pedido completo requiere JOIN de 3 o 4 tablas. Con índices en las FK es barato, pero cuesta más que leer un documento.
+- Escalar horizontalmente (sharding) es más difícil. Escala bien en vertical y con réplicas de lectura.
+- Los cambios de esquema requieren migraciones.
+
+### MongoDB
+**Ventajas**
+- **Lectura de agregado en una sola operación.** Un documento `pedido` con el cliente y las líneas embebidas se lee con una consulta y localidad de disco, sin JOIN.
+- **Esquema flexible** y sharding horizontal nativo.
+- Es natural para el patrón "cargar el pedido completo y mostrarlo".
+
+**Desventajas**
+- **Sin FK.** Las referencias a producto o cliente no se verifican y quedan a cargo de la aplicación.
+- **Desnormalización.** Si se embebe al cliente, sus datos se copian en cada pedido. Para un pedido eso es aceptable (es una foto histórica), pero hay que decidirlo conscientemente.
+- **Coherencia más débil.** `$jsonSchema` valida tipos, rangos y campos requeridos (cantidad > 0, precio ≥ 0), pero **no** puede expresar relaciones entre campos como `subtotal == cantidad × precio` ni `total == suma(subtotales)`. Tampoco puede impedir que los subtotales se desincronicen del total.
+- Las transacciones multi-documento existen desde la 4.0, pero son más costosas y menos idiomáticas.
+- Los JOIN (`$lookup`) y la analítica relacional son más torpes y lentos.
+
+### Modelado en MongoDB
+Una colección `pedidos`, con un documento por pedido (agregado):
+
+```json
+{
+  "_id": 1001,
+  "fecha": ISODate("..."),
+  "estado": "CONFIRMADO",
+  "forma_pago": "TARJETA",
+  "cliente": { "cliente_id": 7, "nombre": "...", "apellido": "...", "email": "..." },
+  "lineas": [
+    { "producto_id": 12, "nombre": "Pizza", "cantidad": 2,
+      "precio_unitario": NumberDecimal("8500.00"),
+      "subtotal": NumberDecimal("17000.00") }
+  ],
+  "total": NumberDecimal("17000.00")
+}
+```
+
+Criterios de modelado:
+- **Embeber las líneas.** Se leen siempre junto con el pedido, su cantidad es acotada y no tienen vida propia. Por eso desaparece la tabla intermedia.
+- **Embeber una copia del cliente** (snapshot) más su `cliente_id`. Sirve como foto histórica y evita el JOIN. El cliente maestro vive en su propia colección.
+- **Mantener `producto` como colección aparte, referenciada por `producto_id`.** Cada línea guarda `precio_unitario` y `nombre` históricos. La cantidad de stock cambia mucho y no debe estar embebida.
+- **Usar `Decimal128` para dinero**, nunca `double`.
+- **Validador `$jsonSchema`** con `minimum`/`exclusiveMinimum` para cantidad y precios, y campos requeridos.
+- **Índices:** `{ "cliente.cliente_id": 1, fecha: -1 }`, `{ estado: 1 }`, y un índice único sobre `cliente.email` en la colección de clientes.
+- **Coherencia de subtotal y total:** validar en la capa de servicio al escribir. Alternativamente, no guardar `subtotal`/`total` y calcularlos con `$multiply` y `$sum` en un pipeline de agregación. Aun así, esta garantía queda en la aplicación y no en la base.
+
+### Comparación respecto de los requisitos
+| Criterio | PostgreSQL | MongoDB |
+|---|---|---|
+| Lectura de pedido completo | JOIN indexado, rápido | Una lectura, más rápida |
+| Integridad referencial | Garantizada por el motor | A cargo de la aplicación |
+| Coherencia precio, subtotal y total | Declarativa (columna generada, CHECK, trigger) | Solo por código de aplicación |
+| Transacción pedido + stock | Nativa | Posible, más costosa |
+| Analítica | Excelente | Limitada |
+
+### Recomendación
+El requisito **indispensable** es la coherencia de cantidades y precios. Ese requisito favorece a PostgreSQL, porque lo garantiza el motor y no el código. Además, el diferencial de rendimiento de MongoDB en la lectura (evitar 3 JOIN indexados) es pequeño a una escala típica de tienda.
+
+1. **Mantener PostgreSQL como fuente de verdad** de pedidos, stock, clientes y precios. Ahí se hacen las escrituras transaccionales.
+2. **Optimizar la lectura en PostgreSQL primero:** índices en las FK, una vista o función que arme el pedido como JSON (`jsonb_agg`), y `subtotal` como columna generada.
+3. **Agregar MongoDB solo si aparece una necesidad concreta.** Ejemplos: lecturas masivas del historial de pedidos, catálogos con atributos variables, o sharding por volumen. En ese caso funcionaría como una **proyección de lectura** (CQRS): los documentos de pedido se derivan desde PostgreSQL mediante outbox o CDC (por ejemplo Debezium). Es de solo lectura, se puede reconstruir y se acepta consistencia eventual. Nunca debe aceptar escrituras directas que reemplacen a la fuente de verdad.
+
+**Migrar íntegramente a MongoDB no lo recomiendo.** Se perdería la garantía declarativa justo en el requisito más crítico, y se trasladaría esa responsabilidad al código de la aplicación sin una ganancia que lo compense.
