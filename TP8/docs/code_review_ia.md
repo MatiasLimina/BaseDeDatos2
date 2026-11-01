@@ -215,7 +215,7 @@ El subagente de Claude de solo lectura emitió el siguiente dictamen técnico:
 ### Hallazgo 2 (TP7): [CORR-02] Agrupación de toda la tabla en la vista comparativa
 * **Descripción de la IA:** En `consultas_postgresql.sql`, `CREATE TEMP VIEW pedido_total` agrupa todo `pedido_detalle` antes de emparejar con los 9 pedidos de la muestra de MongoDB.
 * **Decisión:** **ACEPTADO** (como recomendación; `consultas_postgresql.sql` es del TP7 y no se modificó).
-* **Comprobación en la base:** `EXPLAIN (ANALYZE, BUFFERS)` de la consulta d) en `food_store_copia`, con `scripts/medir_corr02.sql`. Salida completa en [`evidencias/code_review_2_explain.txt`](../evidencias/code_review_2_explain.txt) y resumen en [`evidencias/code_review_2.txt`](../evidencias/code_review_2.txt). Se usó la copia porque el TP8 solo puede usar esa base y la `foodstore` del TP7 no existe en esta máquina; la consulta se midió sin `pedido.estado`, que la copia no tiene y la vista no usa.
+* **Comprobación en la base:** `EXPLAIN (ANALYZE, BUFFERS)` de la consulta d) en `food_store_copia`, con `scripts/medir_corr02.sql`. Salida completa en [`evidencias/code_review_2_explain.txt`](../evidencias/code_review_2_explain.txt) y resumen en [`evidencias/code_review_2.txt`](../evidencias/code_review_2.txt). Se usó la copia porque, por regla del change (`openspec/changes/tp8-tablet-sqlite-sync/tasks.md`), el TP8 solo usa esa base para no tocar la original, y la `foodstore` del TP7 no existe en esta máquina; la consulta se midió sin `pedido.estado`, que la copia no tiene y la vista no usa.
 
   | | Vista original | Con filtro temprano |
   |---|---|---|
@@ -223,8 +223,8 @@ El subagente de Claude de solo lectura emitió el siguiente dictamen técnico:
   | Buffers | 2.621 | 64 |
   | Tiempo de ejecución | 206,6 ms | 0,088 ms |
 
-  Las dos versiones devuelven el mismo pedido (10167).
-* **Lo que no coincidía:** la IA había dado ~24.000 → 18 buffers, ~85 → < 0,2 ms y un Index Scan sobre `pk_pedido_detalle`, sin ningún `EXPLAIN` que lo respalde; el plan real usa `idx_detalle_subtotal`. Sus 621.853 filas y 31 filas pueden corresponder a la `foodstore` del TP7, que no está en esta máquina; en la copia son 621.201 y 12. El diagnóstico (PostgreSQL no lleva la condición del JOIN a través del `GROUP BY`) sí era correcto.
+  Las dos versiones devuelven el mismo pedido (10167). En el TP7 la consulta d) devuelve 1, 20 y 26 (`../evidencias/parte2_salida_postgresql.txt`): la copia tiene otros datos de detalle para los mismos 9 pedidos, así que la medición muestra el efecto del filtro, no la salida del TP7.
+* **Lo que no coincidía:** la IA había dado ~24.000 → 18 buffers, ~85 → < 0,2 ms y un Index Scan sobre `pk_pedido_detalle`, sin ningún `EXPLAIN` que lo respalde; el plan real usa `idx_detalle_subtotal`. Sus 621.853 filas y 31 filas sí corresponden a la `foodstore` del TP7 (`../docs/modelo_documental.md` y `../evidencias/parte1_coleccion.txt`); en la copia son 621.201 y 12. El diagnóstico (PostgreSQL no lleva la condición del JOIN a través del `GROUP BY`) sí era correcto.
 
 ### Hallazgo 3 (TP8): [INTEG-01] Claves foráneas que SQLite no hace cumplir por defecto
 * **Descripción de la IA:** `PRAGMA foreign_keys = ON;` debe ejecutarse en cada conexión; no queda guardado en el archivo `.db`.

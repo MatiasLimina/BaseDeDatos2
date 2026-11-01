@@ -1,7 +1,7 @@
 -- Comprobacion del hallazgo CORR-02 (code review 3.c).
 -- Uso (desde TP8/): psql -X -w -h localhost -U postgres -d food_store_copia -f scripts/medir_corr02.sql
--- Se mide en food_store_copia porque el TP8 solo puede usar esa base y la foodstore del
--- TP7 no existe en esta maquina. La copia no tiene pedido.estado (lo agrego el TP7), por
+-- Se mide en food_store_copia: por regla del change el TP8 solo usa esa base (para no
+-- tocar la original), y la foodstore del TP7 no existe en esta maquina. La copia no tiene pedido.estado (lo agrego el TP7), por
 -- eso el SELECT final no lo muestra: la vista que se mide (pedido_total) no lo usa.
 -- Solo lectura: vistas temporales (mueren con la sesion) y EXPLAIN ANALYZE de un SELECT.
 -- Mide la consulta d) de ../consultas_postgresql.sql con la vista pedido_total original

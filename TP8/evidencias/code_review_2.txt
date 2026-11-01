@@ -5,8 +5,8 @@ las consultas b y d).
 Script de medicion: scripts/medir_corr02.sql
 Salida completa de EXPLAIN (ANALYZE, BUFFERS): evidencias/code_review_2_explain.txt
 
-Base: food_store_copia (PostgreSQL 18.6). El TP8 solo puede usar esa base y la foodstore
-del TP7 no existe en esta maquina. La copia no tiene pedido.estado, por eso la consulta
+Base: food_store_copia (PostgreSQL 18.6). Por regla del change (openspec/.../tasks.md) el TP8 solo usa esa
+base, para no tocar la original; ademas la foodstore del TP7 no existe en esta maquina. La copia no tiene pedido.estado, por eso la consulta
 medida es la d) sin esa columna en el SELECT; la vista pedido_total no la usa.
 
 1. Vista original:
@@ -36,15 +36,22 @@ CREATE TEMP VIEW pedido_total_opt AS
 
    Mismo resultado en las dos versiones: pedido 10167.
 
+   En el TP7 la consulta d) devuelve 1, 20 y 26 (../evidencias/parte2_salida_postgresql.txt).
+   La copia tiene otros datos de detalle para los mismos 9 pedidos (621 201 filas contra
+   621 853; 12 lineas contra 31), asi que esta medicion muestra el efecto del filtro, no la
+   salida del TP7.
+
 4. Lo que la IA habia dicho y no coincide con la medicion:
-   - "621.853 filas" y "31 filas" de los 9 pedidos: en la copia son 621 201 y 12. Pueden
-     ser los conteos de la foodstore del TP7, que no esta en esta maquina.
+   - "621.853 filas" y "31 filas" de los 9 pedidos: son los conteos de la foodstore del TP7
+     (../docs/modelo_documental.md, ../evidencias/parte1_coleccion.txt). En la copia son
+     621 201 y 12. Estas dos cifras estaban bien para el TP7.
    - "~24.000 buffers, ~85 ms" contra "18 buffers, < 0,2 ms": son 2 621 contra 64
      buffers y 206,6 ms contra 0,088 ms.
    - "Index Scan guiado por pk_pedido_detalle": el plan usa idx_detalle_subtotal
      (Index Only Scan).
    El diagnostico es correcto (PostgreSQL no lleva la condicion del JOIN a traves del
-   GROUP BY y agrupa toda la tabla); las cifras no estaban medidas.
+   GROUP BY y agrupa toda la tabla); los buffers, los tiempos y el indice no
+   estaban medidos.
 
 Decision: ACEPTADO. El filtro temprano devuelve el mismo resultado y lee 41 veces menos
 buffers. No se modifico ../consultas_postgresql.sql: es del TP7 y queda fuera del alcance
