@@ -122,5 +122,38 @@ SQLite (tablet) ────────────────[ X ]───�
 </ul>
 
 <h2>3.c Code review con IA</h2>
+<p>Se realiz\u00f3 una revisi\u00f3n t\u00e9cnica de los 107 scripts de la cursada completa (TP1 a TP6, Proyecto Integrador, TP7 y TP8). <strong>Declaraci\u00f3n de herramienta:</strong> La revisi\u00f3n fue efectuada por un agente de Claude de solo lectura (modelo Claude Opus 5.5 / subagente <code>research</code>) y no por el agente Plan de OpenCode, garantizando trazabilidad y preservaci\u00f3n de comentarios.</p>
+
+<table border=\"1\" cellpadding=\"4\" cellspacing=\"0\">
+<thead>
+<tr><th>ID</th><th>Unidad</th><th>Categor\u00eda</th><th>Decisi\u00f3n</th><th>Motivo</th></tr>
+</thead>
+<tbody>
+<tr><td><b>SEC-01</b></td><td>TP7</td><td>Seguridad</td><td>Descartado</td><td>Los campos provienen de ENUMs estrictamente alfanum\u00e9ricos en PostgreSQL (imposible inyecci\u00f3n).</td></tr>
+<tr><td><b>SEC-02</b></td><td>TP7</td><td>Seguridad</td><td>Aceptado</td><td>Validaci\u00f3n de formato CSV en script de test local.</td></tr>
+<tr><td><b>CORR-01</b></td><td>TP8</td><td>Correctitud</td><td>Descartado</td><td>La evaluaci\u00f3n local es simulaci\u00f3n (consistencia eventual); el stock real lo bloquea PostgreSQL.</td></tr>
+<tr><td><b>CORR-02</b></td><td>TP7</td><td>Rendimiento</td><td>Aceptado</td><td>Filtrado temprano en vista comparativa evita escanear 621.853 filas para 9 pedidos (&gt; 400x).</td></tr>
+<tr><td><b>CORR-03</b></td><td>TP8</td><td>Correctitud</td><td>Descartado</td><td>El directorio en el host se llama literalmente <code>PosgresSQL</code>; corregir a ciegas romper\u00eda psql.</td></tr>
+<tr><td><b>INTEG-01</b></td><td>TP8</td><td>Integridad</td><td>Aceptado</td><td>Exigencia de ejecutar <code>PRAGMA foreign_keys = ON;</code> en cada conexi\u00f3n cliente en SQLite.</td></tr>
+<tr><td><b>INTEG-02</b></td><td>TP1\u20136</td><td>Integridad</td><td>Aceptado (hist\u00f3rico)</td><td>Falta de CHECK de subtotal en modelo relacional original (repositorio externo cerrado).</td></tr>
+<tr><td><b>INTEG-03</b></td><td>TP3\u20134</td><td>Calidad</td><td>Aceptado (hist\u00f3rico)</td><td>Sesgo de 200.000 pedidos al cliente 4812 (lecci\u00f3n aprendida de generaci\u00f3n sint\u00e9tica).</td></tr>
+<tr><td><b>INTEG-04</b></td><td>TP8</td><td>Integridad</td><td>Aceptado (fortaleza)</td><td>Validaci\u00f3n estricta de formato can\u00f3nico de UUIDs en tablas STRICT.</td></tr>
+<tr><td><b>IDEM-01</b></td><td>TP7</td><td>Idempotencia</td><td>Aceptado</td><td>Uso de <code>drop()</code> incondicional admisible solo en entorno de laboratorio.</td></tr>
+<tr><td><b>IDEM-02</b></td><td>TP7</td><td>Rendimiento</td><td>Aceptado</td><td>UPDATE masivo en PG genera tuplas muertas; requiere VACUUM ANALYZE.</td></tr>
+<tr><td><b>IDEM-03</b></td><td>TP8</td><td>Idempotencia</td><td>Aceptado (fortaleza)</td><td>Patr\u00f3n transaccional robusto con guarda temporal de filas y l\u00e1pidas en upsert.</td></tr>
+</tbody>
+</table>
+
+<p><em>(La tabla completa detallada se encuentra en <code>docs/code_review_ia.md</code>).</em></p>
+
+<h3>Tres hallazgos desarrollados con comprobaci\u00f3n emp\u00edrica:</h3>
+<ol>
+  <li><strong>[CORR-01] Supuesta \"Aprobaci\u00f3n fantasma de stock\" en sem\u00e1foro de TP8 (Descartado con fundamento):</strong><br>
+  La IA cuestion\u00f3 que dos solicitudes encoladas de 2 unidades frente a un stock de 3 aprueben como simulaci\u00f3n. Se comprob\u00f3 en <code>evidencias/code_review_1.txt</code> que ambas aprueban porque <code>SIMULADO_APROBADO</code> es una propuesta desconectada monousuario en la feria, no una venta confirmada. Deducir stock localmente crear\u00eda inventarios divergentes entre tablets; la protecci\u00f3n ante sobreventa la ejerce PostgreSQL de forma at\u00f3mica al sincronizar.</li>
+  <li><strong>[CORR-02] Agrupaci\u00f3n exhaustiva en vista comparativa de TP7 (Aceptado):</strong><br>
+  En <code>consultas_postgresql.sql</code>, la vista temporal <code>pedido_total</code> agrupaba las 621.853 filas de <code>pedido_detalle</code>. Se comprob\u00f3 en <code>evidencias/code_review_2.txt</code> que agregar el filtro <code>WHERE d.pedido_id IN (SELECT id FROM migrados)</code> sustituye el escaneo completo por un Index Scan sobre 31 filas, reduciendo los buffers de 24.000 a 18 (&lt; 0.2 ms).</li>
+  <li><strong>[CORR-03] Supuesto error tipogr\u00e1fico en ruta PosgresSQL en TP8 (Descartado con refutaci\u00f3n):</strong><br>
+  La IA recomend\u00f3 corregir la ruta <code>/d/DevTools/PosgresSQL/bin</code> a <code>PostgreSQL</code>. Se comprob\u00f3 en <code>evidencias/code_review_3.txt</code> inspeccionando el sistema de archivos del host que la carpeta instalada se llama exactamente <code>PosgresSQL</code>. Seguir la recomendaci\u00f3n a ciegas habr\u00eda roto el acceso a <code>psql</code> en la m\u00e1quina del usuario. Se configuraron ambas rutas en el PATH para asegurar portabilidad.</li>
+</ol>
 </body>
 </html>

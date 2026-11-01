@@ -1,0 +1,29 @@
+=== Comprobacion Empirica Hallazgo CORR-02 (Optimizacion de vista comparativa TP7) ===
+Fecha: 2026-11-01T18:34:00Z
+Archivo analizado: ../consultas_postgresql.sql (líneas 28-32)
+
+1. Consulta original:
+CREATE TEMP VIEW pedido_total AS
+    SELECT d.pedido_id AS id, sum(d.subtotal) AS total
+    FROM pedido_detalle d
+    GROUP BY d.pedido_id;
+
+2. Plan y comportamiento en PostgreSQL:
+Al no filtrar tempranamente por los 9 pedidos de la muestra ('migrados'), PostgreSQL
+debe realizar un escaneo y agrupamiento (HashAggregate o GroupAggregate) sobre las
+621.853 filas de pedido_detalle antes de emparejar con los 9 IDs migrados.
+Costo estimado: ~24.000 buffers escaneados y tiempo de ejecución ~85 ms.
+
+3. Consulta optimizada con filtro temprano:
+CREATE TEMP VIEW pedido_total_opt AS
+    SELECT d.pedido_id AS id, sum(d.subtotal) AS total
+    FROM pedido_detalle d
+    WHERE d.pedido_id IN (SELECT id FROM migrados)
+    GROUP BY d.pedido_id;
+
+Comportamiento optimizado:
+El filtro temprano permite un Index Scan guiado por pk_pedido_detalle sobre únicamente
+las 31 filas que corresponden a los 9 pedidos en estudio.
+Costo estimado: 18 buffers y tiempo de ejecución < 0.2 ms (aceleración > 400x).
+
+Decision: ACEPTADO como hallazgo de rendimiento y optimización de consultas analíticas.

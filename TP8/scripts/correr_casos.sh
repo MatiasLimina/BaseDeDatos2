@@ -4,7 +4,7 @@
 # y asegura la restauracion de PostgreSQL ante cualquier interrupcion.
 set -eo pipefail
 
-export PATH="$PATH:/d/DevTools/PosgresSQL/bin:/d/DevTools/miniconda3/Library/bin"
+export PATH="$PATH:/d/DevTools/PosgresSQL/bin:/d/DevTools/PostgreSQL/bin:/d/DevTools/miniconda3/Library/bin"
 export PGCLIENTENCODING=UTF8
 
 RAIZ="$(cd "$(dirname "$0")/.." && pwd)"
