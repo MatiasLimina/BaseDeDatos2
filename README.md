@@ -17,6 +17,10 @@ La base relacional es la `foodstore` del proyecto integrador. Ver el repositorio
 
 Evidencias en [`evidencias/`](evidencias/).
 
+**Entrega:**
+- [`informe_tp7.pdf`](informe_tp7.pdf): 4 páginas (la consigna permite 5), generado desde [`informe/informe_tp7.html`](informe/informe_tp7.html).
+- Archivos adjuntos: [`consultas_mongodb.js`](consultas_mongodb.js) y [`consultas_postgresql.sql`](consultas_postgresql.sql).
+
 ## Orden de ejecución
 
 Requiere:
@@ -41,4 +45,7 @@ bash tests/test_migracion.sh                                                    
 mongosh mongodb://localhost:27017/foodstore --file consultas_mongodb.js
 psql -X -w -h localhost -U postgres -d foodstore -v ON_ERROR_STOP=1 -f consultas_postgresql.sql
 bash tests/test_consultas.sh                                                          # -> test_consultas: OK
+
+# Informe: regenerar el PDF y verificar que no supere las 5 páginas
+bash informe/generar_pdf.sh
 ```
