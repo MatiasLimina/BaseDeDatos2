@@ -1,6 +1,6 @@
 # Bitácora de uso de IA - TP8
 
-Integrantes: (completar con los integrantes del equipo)
+Integrantes: Matias Limina - Nicolas Monjelardi - Lautaro Aguero
 
 Herramienta: Claude Code + OpenSpec (OPSX), en lugar de Kiro/OpenCode que pedía la consigna.
 
