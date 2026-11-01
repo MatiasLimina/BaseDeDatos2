@@ -149,7 +149,7 @@ SQLite (tablet) ────────────────[ X ]───�
 <tbody>
 <tr><td><b>SEC-01</b></td><td>TP7</td><td>Seguridad</td><td>Descartado</td><td>Los campos provienen de ENUMs estrictamente alfanuméricos en PostgreSQL (imposible inyección).</td></tr>
 <tr><td><b>SEC-02</b></td><td>TP7</td><td>Seguridad</td><td>Aceptado</td><td>Validación de formato CSV en script de test local.</td></tr>
-<tr><td><b>CORR-01</b></td><td>TP8</td><td>Correctitud</td><td>Descartado</td><td>La evaluación local es simulación (consistencia eventual); el stock real lo bloquea PostgreSQL.</td></tr>
+<tr><td><b>CORR-01</b></td><td>TP8</td><td>Correctitud</td><td>Descartado</td><td><code>SIMULADO_APROBADO</code> no es venta ni reserva; controlar el stock entre ventas le toca al servidor al confirmar, fuera del TP8.</td></tr>
 <tr><td><b>CORR-02</b></td><td>TP7</td><td>Rendimiento</td><td>Aceptado</td><td>Medido con <code>EXPLAIN ANALYZE</code>: el filtro temprano baja de 621.201 filas y 2.621 buffers a 12 filas y 64 buffers, con el mismo resultado.</td></tr>
 <tr><td><b>CORR-03</b></td><td>TP8</td><td>Correctitud</td><td>Descartado</td><td>El directorio en el host se llama literalmente <code>PosgresSQL</code>; corregir a ciegas rompería psql.</td></tr>
 <tr><td><b>INTEG-01</b></td><td>TP8</td><td>Integridad</td><td>Aceptado</td><td>Exigencia de ejecutar <code>PRAGMA foreign_keys = ON;</code> en cada conexión cliente en SQLite.</td></tr>

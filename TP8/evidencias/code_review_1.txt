@@ -8,7 +8,7 @@ Resultado en SQLite:
 
 Fundamento del descarte:
 1. En la tablet cada borrador se evalua de forma aislada porque SIMULADO_APROBADO
-   no es una venta confirmada ni reserva stock en el servidor (consistencia eventual).
+   no es una venta confirmada ni reserva stock en el servidor.
 2. Controlar el stock entre varias ventas le corresponde al servidor cuando la venta se
    confirme, y eso queda fuera del TP8 (la tablet nunca escribe en PostgreSQL). Descontar
    stock en una tablet desconectada daria inventarios distintos en cada tablet y una

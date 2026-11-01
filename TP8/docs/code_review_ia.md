@@ -207,7 +207,7 @@ El subagente de Claude de solo lectura emitió el siguiente dictamen técnico:
 ### Hallazgo 1 (TP8): [CORR-01] Supuesta "Aprobación fantasma de stock" en el semáforo
 * **Descripción de la IA:** El semáforo clasifica solicitudes de forma individual contra `s.stock`. Dos solicitudes concurrentes de 2 unidades frente a un stock de 3 resultarían ambas en `SIMULADO_APROBADO`.
 * **Decisión:** **DESCARTADO con fundamento comprobable**.
-* **Comprobación y refutación empírica:** Registrada en [`evidencias/code_review_1.txt`](../evidencias/code_review_1.txt). Se comprobó en SQLite que ambas solicitudes simulan aprobado, pero esto responde estrictamente al modelo de consistencia eventual de la aplicación:
+* **Comprobación y refutación empírica:** Registrada en [`evidencias/code_review_1.txt`](../evidencias/code_review_1.txt). Se comprobó en SQLite que ambas solicitudes simulan aprobado, y es lo esperado, porque la evaluación es una simulación:
   1. Cada tablet opera desconectada y monousuario en la feria; el semáforo es solo una **propuesta de simulación**, nunca una venta ni reserva de inventario.
   2. Si la tablet descontara stock localmente sin comunicación bidireccional, múltiples tablets generarían inventarios locales divergentes y falsas sensaciones de stock.
   3. Controlar el stock entre varias ventas le corresponde al servidor cuando la venta se confirme. Eso queda fuera del TP8: la tablet nunca escribe en PostgreSQL.
