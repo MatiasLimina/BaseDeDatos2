@@ -22,6 +22,24 @@
 <p>La fuente de verdad es PostgreSQL: el precio, el stock y las ventas los decide el servidor. La tablet trabaja con una copia de solo lectura que puede estar vieja, y por eso cada solicitud se vuelve a comparar contra una instantánea nueva. Lo único que manda la tablet son sus borradores y solicitudes, y nada de eso vuelve al servidor en este TP.</p>
 
 <h2>2.c Casos de sincronización</h2>
+<p>Todo se corre con <code>bash scripts/correr_casos.sh</code> (desde <code>TP8/</code>). Para cada caso, el script arma el borrador en SQLite, cambia la <strong>copia</strong> del servidor (<code>food_store_copia</code>) si hace falta, exporta una instantánea nueva, la importa y corre <code>movil/semaforo.sql</code>. La instantánea inicial S0 es del <code>2026-11-01T23:04:40Z</code>. Resultado final de <code>cola_sync</code>:</p>
+<table border="1" cellpadding="4" cellspacing="0">
+<tr><th>Caso</th><th>Qué se preparó (comando)</th><th>Resultado (estado · motivo)</th><th>Por qué</th></tr>
+<tr><td>C5</td><td>Borrador de 2 unidades del producto D, sin cambios (<code>pruebas_sqlite.sql</code>) → <code>semaforo.sql</code></td><td><code>SIMULADO_APROBADO</code></td><td>Precio y stock vistos coinciden con la instantánea. Es solo una simulación: no crea un pedido en el servidor.</td></tr>
+<tr><td>C6</td><td>Reenviar la misma solicitud (<code>movil/casos/c5_c6.sql</code>) y volver a correr el semáforo</td><td><code>UNIQUE constraint failed: cola_sync.solicitud_uuid</code> · el semáforo reporta <code>changes() = 0</code></td><td>El UUID es la clave primaria de <code>cola_sync</code>: el reintento no se duplica. Como solo se evalúan las <code>PENDIENTE</code>, repetir la simulación no reevalúa nada.</td></tr>
+<tr><td>C2</td><td>Borrador con A a 2750,00 (<code>c2_borrador.sql</code>); en el servidor <code>sql/casos/preparar_c2.sql</code> sube A a 2990,00; nueva instantánea; <code>semaforo.sql</code></td><td><code>CONFLICTO</code> · producto 1: precio visto 275000, actual 299000</td><td>No hay rojo pero cambió un precio. El cliente acepta (<code>c2_aceptar.sql</code>): se actualiza el precio visto y una <strong>solicitud nueva</strong> da <code>SIMULADO_APROBADO</code>; la vieja queda en <code>CONFLICTO</code> como historial.</td></tr>
+<tr><td>C3</td><td>Borrador de 5 unidades del producto B, que tiene stock 4 (<code>c3_borrador.sql</code>)</td><td><code>RECHAZADO</code> · producto 24: pide 5, stock 4</td><td>Rojo por stock. No hizo falta tocar el stock del servidor: el borrador pide más de lo que hay.</td></tr>
+<tr><td>C4</td><td>Borrador con C (<code>c4_borrador.sql</code>); en el servidor <code>sql/casos/preparar_c4.sql</code> pone <code>activo = false</code>; nueva instantánea</td><td><code>RECHAZADO</code> · producto 3: dado de baja</td><td>Rojo por baja lógica. Al recargar, la fila de C sigue en <code>producto_cache</code> con <code>eliminado = 1</code> (lápida), pero ya no aparece en el catálogo disponible (consulta C1: 0 filas para el id 3).</td></tr>
+</table>
+<p><strong>PostgreSQL no cambió.</strong> Al final, <code>sql/casos/restaurar_casos.sql</code> devuelve A a 2750,00 y C a activo, y <code>sql/verificacion_final.sql</code> repite las métricas de <code>sql/linea_base.sql</code> (tomada antes de tocar nada). El script las compara y falla si difieren:</p>
+<table border="1" cellpadding="4" cellspacing="0">
+<tr><th>Métrica</th><th>Línea base</th><th>Después de los casos</th></tr>
+<tr><td>Pedidos (<code>count(*) FROM pedido</code>)</td><td>200 002</td><td>200 002</td></tr>
+<tr><td>Stock total (<code>sum(stock) FROM producto</code>)</td><td>5 012 740</td><td>5 012 740</td></tr>
+<tr><td>Huella md5 de <code>producto</code> (id, nombre, precio, stock, activo, categoría)</td><td><code>3dfee1ff…aa1</code></td><td><code>3dfee1ff…aa1</code></td></tr>
+</table>
+<p>La tablet nunca se conectó a PostgreSQL (el único canal es el CSV) y ningún <code>SIMULADO_APROBADO</code> generó un pedido. Los únicos cambios en el servidor fueron los que preparan C2 y C4, hechos a mano sobre la copia y revertidos.</p>
+<p><strong>C6 en un sistema real (parada 8):</strong> la clave primaria de la tablet solo evita duplicados <em>dentro</em> de la tablet. La protección real va en el servidor. Ahí se guarda cada <code>solicitud_uuid</code> procesado en una tabla con restricción <code>UNIQUE</code>, en la misma transacción que crea el pedido. Si llega un reintento, el servidor devuelve el resultado original en lugar de crear un segundo pedido.</p>
 
 <h2>3.a Mapa de los tres motores</h2>
 <p>Cada dato del ecosistema Food Store tiene un único motor que manda (fuente de verdad). Los demás motores mantienen copias derivadas de solo lectura o directamente no almacenan el dato.</p>
@@ -122,38 +140,38 @@ SQLite (tablet) ────────────────[ X ]───�
 </ul>
 
 <h2>3.c Code review con IA</h2>
-<p>Se realiz\u00f3 una revisi\u00f3n t\u00e9cnica de los 107 scripts de la cursada completa (TP1 a TP6, Proyecto Integrador, TP7 y TP8). <strong>Declaraci\u00f3n de herramienta:</strong> La revisi\u00f3n fue efectuada por un agente de Claude de solo lectura (modelo Claude Opus 5.5 / subagente <code>research</code>) y no por el agente Plan de OpenCode, garantizando trazabilidad y preservaci\u00f3n de comentarios.</p>
+<p>Se realizó una revisión técnica de los 107 scripts de la cursada completa (TP1 a TP6, Proyecto Integrador, TP7 y TP8). <strong>Declaración de herramienta:</strong> La revisión fue efectuada por un agente de Claude de solo lectura (modelo Claude Opus 5.5 / subagente <code>research</code>) y no por el agente Plan de OpenCode, garantizando trazabilidad y preservación de comentarios.</p>
 
-<table border=\"1\" cellpadding=\"4\" cellspacing=\"0\">
+<table border="1" cellpadding="4" cellspacing="0">
 <thead>
-<tr><th>ID</th><th>Unidad</th><th>Categor\u00eda</th><th>Decisi\u00f3n</th><th>Motivo</th></tr>
+<tr><th>ID</th><th>Unidad</th><th>Categoría</th><th>Decisión</th><th>Motivo</th></tr>
 </thead>
 <tbody>
-<tr><td><b>SEC-01</b></td><td>TP7</td><td>Seguridad</td><td>Descartado</td><td>Los campos provienen de ENUMs estrictamente alfanum\u00e9ricos en PostgreSQL (imposible inyecci\u00f3n).</td></tr>
-<tr><td><b>SEC-02</b></td><td>TP7</td><td>Seguridad</td><td>Aceptado</td><td>Validaci\u00f3n de formato CSV en script de test local.</td></tr>
-<tr><td><b>CORR-01</b></td><td>TP8</td><td>Correctitud</td><td>Descartado</td><td>La evaluaci\u00f3n local es simulaci\u00f3n (consistencia eventual); el stock real lo bloquea PostgreSQL.</td></tr>
+<tr><td><b>SEC-01</b></td><td>TP7</td><td>Seguridad</td><td>Descartado</td><td>Los campos provienen de ENUMs estrictamente alfanuméricos en PostgreSQL (imposible inyección).</td></tr>
+<tr><td><b>SEC-02</b></td><td>TP7</td><td>Seguridad</td><td>Aceptado</td><td>Validación de formato CSV en script de test local.</td></tr>
+<tr><td><b>CORR-01</b></td><td>TP8</td><td>Correctitud</td><td>Descartado</td><td>La evaluación local es simulación (consistencia eventual); el stock real lo bloquea PostgreSQL.</td></tr>
 <tr><td><b>CORR-02</b></td><td>TP7</td><td>Rendimiento</td><td>Aceptado</td><td>Filtrado temprano en vista comparativa evita escanear 621.853 filas para 9 pedidos (&gt; 400x).</td></tr>
-<tr><td><b>CORR-03</b></td><td>TP8</td><td>Correctitud</td><td>Descartado</td><td>El directorio en el host se llama literalmente <code>PosgresSQL</code>; corregir a ciegas romper\u00eda psql.</td></tr>
-<tr><td><b>INTEG-01</b></td><td>TP8</td><td>Integridad</td><td>Aceptado</td><td>Exigencia de ejecutar <code>PRAGMA foreign_keys = ON;</code> en cada conexi\u00f3n cliente en SQLite.</td></tr>
-<tr><td><b>INTEG-02</b></td><td>TP1\u20136</td><td>Integridad</td><td>Aceptado (hist\u00f3rico)</td><td>Falta de CHECK de subtotal en modelo relacional original (repositorio externo cerrado).</td></tr>
-<tr><td><b>INTEG-03</b></td><td>TP3\u20134</td><td>Calidad</td><td>Aceptado (hist\u00f3rico)</td><td>Sesgo de 200.000 pedidos al cliente 4812 (lecci\u00f3n aprendida de generaci\u00f3n sint\u00e9tica).</td></tr>
-<tr><td><b>INTEG-04</b></td><td>TP8</td><td>Integridad</td><td>Aceptado (fortaleza)</td><td>Validaci\u00f3n estricta de formato can\u00f3nico de UUIDs en tablas STRICT.</td></tr>
+<tr><td><b>CORR-03</b></td><td>TP8</td><td>Correctitud</td><td>Descartado</td><td>El directorio en el host se llama literalmente <code>PosgresSQL</code>; corregir a ciegas rompería psql.</td></tr>
+<tr><td><b>INTEG-01</b></td><td>TP8</td><td>Integridad</td><td>Aceptado</td><td>Exigencia de ejecutar <code>PRAGMA foreign_keys = ON;</code> en cada conexión cliente en SQLite.</td></tr>
+<tr><td><b>INTEG-02</b></td><td>TP1–6</td><td>Integridad</td><td>Aceptado (histórico)</td><td>Falta de CHECK de subtotal en modelo relacional original (repositorio externo cerrado).</td></tr>
+<tr><td><b>INTEG-03</b></td><td>TP3–4</td><td>Calidad</td><td>Aceptado (histórico)</td><td>Sesgo de 200.000 pedidos al cliente 4812 (lección aprendida de generación sintética).</td></tr>
+<tr><td><b>INTEG-04</b></td><td>TP8</td><td>Integridad</td><td>Aceptado (fortaleza)</td><td>Validación estricta de formato canónico de UUIDs en tablas STRICT.</td></tr>
 <tr><td><b>IDEM-01</b></td><td>TP7</td><td>Idempotencia</td><td>Aceptado</td><td>Uso de <code>drop()</code> incondicional admisible solo en entorno de laboratorio.</td></tr>
 <tr><td><b>IDEM-02</b></td><td>TP7</td><td>Rendimiento</td><td>Aceptado</td><td>UPDATE masivo en PG genera tuplas muertas; requiere VACUUM ANALYZE.</td></tr>
-<tr><td><b>IDEM-03</b></td><td>TP8</td><td>Idempotencia</td><td>Aceptado (fortaleza)</td><td>Patr\u00f3n transaccional robusto con guarda temporal de filas y l\u00e1pidas en upsert.</td></tr>
+<tr><td><b>IDEM-03</b></td><td>TP8</td><td>Idempotencia</td><td>Aceptado (fortaleza)</td><td>Patrón transaccional robusto con guarda temporal de filas y lápidas en upsert.</td></tr>
 </tbody>
 </table>
 
 <p><em>(La tabla completa detallada se encuentra en <code>docs/code_review_ia.md</code>).</em></p>
 
-<h3>Tres hallazgos desarrollados con comprobaci\u00f3n emp\u00edrica:</h3>
+<h3>Tres hallazgos desarrollados con comprobación empírica:</h3>
 <ol>
-  <li><strong>[CORR-01] Supuesta \"Aprobaci\u00f3n fantasma de stock\" en sem\u00e1foro de TP8 (Descartado con fundamento):</strong><br>
-  La IA cuestion\u00f3 que dos solicitudes encoladas de 2 unidades frente a un stock de 3 aprueben como simulaci\u00f3n. Se comprob\u00f3 en <code>evidencias/code_review_1.txt</code> que ambas aprueban porque <code>SIMULADO_APROBADO</code> es una propuesta desconectada monousuario en la feria, no una venta confirmada. Deducir stock localmente crear\u00eda inventarios divergentes entre tablets; la protecci\u00f3n ante sobreventa la ejerce PostgreSQL de forma at\u00f3mica al sincronizar.</li>
-  <li><strong>[CORR-02] Agrupaci\u00f3n exhaustiva en vista comparativa de TP7 (Aceptado):</strong><br>
-  En <code>consultas_postgresql.sql</code>, la vista temporal <code>pedido_total</code> agrupaba las 621.853 filas de <code>pedido_detalle</code>. Se comprob\u00f3 en <code>evidencias/code_review_2.txt</code> que agregar el filtro <code>WHERE d.pedido_id IN (SELECT id FROM migrados)</code> sustituye el escaneo completo por un Index Scan sobre 31 filas, reduciendo los buffers de 24.000 a 18 (&lt; 0.2 ms).</li>
-  <li><strong>[CORR-03] Supuesto error tipogr\u00e1fico en ruta PosgresSQL en TP8 (Descartado con refutaci\u00f3n):</strong><br>
-  La IA recomend\u00f3 corregir la ruta <code>/d/DevTools/PosgresSQL/bin</code> a <code>PostgreSQL</code>. Se comprob\u00f3 en <code>evidencias/code_review_3.txt</code> inspeccionando el sistema de archivos del host que la carpeta instalada se llama exactamente <code>PosgresSQL</code>. Seguir la recomendaci\u00f3n a ciegas habr\u00eda roto el acceso a <code>psql</code> en la m\u00e1quina del usuario. Se configuraron ambas rutas en el PATH para asegurar portabilidad.</li>
+  <li><strong>[CORR-01] Supuesta "Aprobación fantasma de stock" en semáforo de TP8 (Descartado con fundamento):</strong><br>
+  La IA cuestionó que dos solicitudes encoladas de 2 unidades frente a un stock de 3 aprueben como simulación. Se comprobó en <code>evidencias/code_review_1.txt</code> que ambas aprueban porque <code>SIMULADO_APROBADO</code> es una propuesta desconectada monousuario en la feria, no una venta confirmada. Deducir stock localmente crearía inventarios divergentes entre tablets; la protección ante sobreventa la ejerce PostgreSQL de forma atómica al sincronizar.</li>
+  <li><strong>[CORR-02] Agrupación exhaustiva en vista comparativa de TP7 (Aceptado):</strong><br>
+  En <code>consultas_postgresql.sql</code>, la vista temporal <code>pedido_total</code> agrupaba las 621.853 filas de <code>pedido_detalle</code>. Se comprobó en <code>evidencias/code_review_2.txt</code> que agregar el filtro <code>WHERE d.pedido_id IN (SELECT id FROM migrados)</code> sustituye el escaneo completo por un Index Scan sobre 31 filas, reduciendo los buffers de 24.000 a 18 (&lt; 0.2 ms).</li>
+  <li><strong>[CORR-03] Supuesto error tipográfico en ruta PosgresSQL en TP8 (Descartado con refutación):</strong><br>
+  La IA recomendó corregir la ruta <code>/d/DevTools/PosgresSQL/bin</code> a <code>PostgreSQL</code>. Se comprobó en <code>evidencias/code_review_3.txt</code> inspeccionando el sistema de archivos del host que la carpeta instalada se llama exactamente <code>PosgresSQL</code>. Seguir la recomendación a ciegas habría roto el acceso a <code>psql</code> en la máquina del usuario. Se configuraron ambas rutas en el PATH para asegurar portabilidad.</li>
 </ol>
 </body>
 </html>
