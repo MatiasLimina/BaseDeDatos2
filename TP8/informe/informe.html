@@ -135,7 +135,7 @@ SQLite (tablet) ────────────────[ X ]───�
       <li><em>SQLite:</em> Respaldo en caliente al cierre de cada jornada de feria con <code>VACUUM INTO 'respaldo_jornada_YYYYMMDD.db'</code>. La prueba de restauración se realiza semanalmente comprobando <code>PRAGMA integrity_check</code> y conteos en las cuatro tablas.</li>
     </ul>
   </li>
-  <li><strong>Contingencia ante restauración de respaldo viejo de PostgreSQL:</strong> Las tablets no confían en su caché ni en resultados simulados previos. Invalidan <code>snapshot_servidor</code>, descargan una instantánea fresca con <code>copiado_en</code> posterior a la restauración del servidor y reevalúan las solicitudes <code>PENDIENTE</code> con el semáforo.</li>
+  <li><strong>Contingencia ante restauración de respaldo viejo de PostgreSQL:</strong> Las tablets no confían en su caché ni en resultados simulados previos. Invalidan <code>snapshot_servidor</code>, descargan una instantánea fresca con <code>copiado_en</code> posterior a la restauración del servidor y evalúan las solicitudes <code>PENDIENTE</code> con el semáforo. Los <code>SIMULADO_APROBADO</code> anteriores no cambian de estado (el semáforo solo evalúa <code>PENDIENTE</code>): los borradores afectados se reenvían con una solicitud nueva (UUID nuevo), que se evalúa contra la instantánea nueva.</li>
   <li><strong>Revisión periódica:</strong> Al cierre de cada jornada de feria (y antes de la siguiente sincronización), el <strong>Encargado del Food Truck</strong> revisa las solicitudes en <code>CONFLICTO</code> (para actualizar precio visto o desistir) y en <code>RECHAZADO</code> (para registrar mermas o anular).</li>
 </ul>
 

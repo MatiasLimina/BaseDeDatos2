@@ -37,11 +37,11 @@
 
 Si el servidor central PostgreSQL sufre una contingencia grave y debe restaurarse a un respaldo anterior (con pérdida de transacciones recientes, RPO > 0):
 
-1. **Principio de desconfianza:** La tablet **no confía en su caché local ni en resultados simulados previos**. Un estado `SIMULADO_APROBADO` obtenido contra una instantánea que el servidor ya no reconoce como vigente queda inmediatamente invalidado.
+1. **Principio de desconfianza:** La tablet **no confía en su caché local ni en resultados simulados previos**. Un `SIMULADO_APROBADO` obtenido contra una instantánea anterior a la restauración deja de ser confiable, pero su estado no cambia: el semáforo solo evalúa solicitudes `PENDIENTE`. La columna `snapshot_copiado_en` de `cola_sync` indica contra qué instantánea se evaluó cada una.
 2. **Invalidación de la instantánea:** La tabla `snapshot_servidor` se vacía y se suspende la evaluación del semáforo hasta recibir la nueva instantánea oficial.
 3. **Recarga de instantánea fresca:** Una vez restaurado el servidor, se exporta una nueva instantánea con `copiado_en` estrictamente posterior a la fecha/hora de la restauración.
-4. **Reevaluación de solicitudes:** La tablet importa la nueva instantánea y re-ejecuta `movil/semaforo.sql` para todas las solicitudes que permanecían en `PENDIENTE`.
-5. **Auditoría de discrepancias:** Toda solicitud que hubiera cambiado de resultado (por ejemplo, pedidos armados con precios que volvieron a valores antiguos o stock que volvió a estar disponible) es separada para revisión antes de cualquier intento de confirmación.
+4. **Evaluación de las pendientes:** La tablet importa la nueva instantánea y re-ejecuta `movil/semaforo.sql`, que evalúa las solicitudes que seguían en `PENDIENTE`.
+5. **Reenvío de los borradores afectados:** Cada borrador cuya solicitud se evaluó contra una instantánea anterior a la restauración se reenvía con una **solicitud nueva (UUID nuevo)**, que se evalúa contra la instantánea nueva. La solicitud vieja queda como historia; reenviar el mismo UUID fallaría por clave primaria (caso C6).
 
 ---
 
