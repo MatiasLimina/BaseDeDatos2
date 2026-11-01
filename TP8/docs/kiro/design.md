@@ -1,72 +1,52 @@
-# Diseño de Arquitectura - Tablet Offline y Cierre de Capa de Datos (TP8)
+# Diseño: tablet con SQLite y sincronización simulada (TP8)
 
-## 1. Visión General de la Arquitectura
-El sistema implementa una arquitectura **Offline-First** para terminales móviles (tablets de preventistas y vendedores de campo).
+> Nota: estos documentos se derivan de OpenSpec (`openspec/changes/tp8-tablet-sqlite-sync/`) porque el equipo no usó Kiro. Mantienen el formato de tres archivos de Kiro. Las decisiones salen del `design.md` de ese change.
 
-La arquitectura se compone de dos capas de persistencia conectadas de manera asíncrona:
-1. **Base Central (PostgreSQL)**: Fuente de la verdad transaccional (Single Source of Truth). Gestiona el catálogo de productos, niveles de stock en tiempo real, histórico de pedidos y políticas comerciales.
-2. **Base Local de Tablet (SQLite)**: Base de datos embebida ligera que almacena un subconjunto de trabajo (cache local de clientes y productos) y permite la captura autónoma de pedidos borrador sin conexión a red.
+## Flujo
 
-```
-+--------------------------------------------------------+
-|               Servidor Central (PostgreSQL)           |
-|  - Catalogo maestro de productos                       |
-|  - Control de stock y reservas                         |
-|  - Resolucion definitiva transaccional (ACID)          |
-+---------------------------+----------------------------+
-                            |
-           [Exportacion Snapshot via CSV / ETL]
-                            |
-                            v
-+--------------------------------------------------------+
-|                Tablet Movil (SQLite 3)                 |
-|  - Tablas STRICT (clientes, productos, pedidos, etc.)  |
-|  - Snapshot tipado (snapshot_servidor)                 |
-|  - Evaluacion local Offline (Semaforo SQL determinista)|
-|  - Captura autonoma de borradores                      |
-+--------------------------------------------------------+
-```
+1. Se exporta S0 (la instantánea) en CSV desde la vista `v_snapshot_movil` de `food_store_copia` (`sql/02_exportar_snapshot.sql`).
+2. Se importa en SQLite (`movil/importar_snapshot.sql`): primero a `snapshot_servidor` y después, con un upsert, a `producto_cache`.
+3. La tablet arma borradores (`pedido_borrador` e `item_borrador`).
+4. Cada envío crea una fila `PENDIENTE` en `cola_sync`.
+5. El semáforo (`movil/semaforo.sql`) evalúa las `PENDIENTE` contra `snapshot_servidor`.
 
----
+De SQLite no vuelve nada al servidor.
 
-## 2. Componentes de la Base Local (SQLite)
+## Tablas de SQLite (`movil/schema_sqlite.sql`)
 
-### 2.1 Esquema Tipado STRICT
-Para prevenir los problemas de coerción de tipos dinámicos típicos de SQLite (donde campos textuales pueden provocar comparaciones léxicas erróneas como `'5' > '48'`), todas las tablas locales se definen con el modificador `STRICT`:
-- `clientes`: Datos de contacto, saldo actual y límite de crédito.
-- `productos`: Catálogo local offline con precio unitario, stock local y flag de sincronización (`sincronizado_servidor`).
-- `pedidos`: Cabeceras de pedidos generados en la tablet, con fecha, estado local (`BORRADOR`, `PENDIENTE_SYNC`, `APROBADO`, `RECHAZADO`, `CONFLICTO`) y tracking de sincronización.
-- `items_pedido`: Detalle de productos, cantidades y precios capturados en el momento de la preventa.
-- `snapshot_servidor`: Tabla temporal o persistente de importación con tipado estricto que recibe el volcado CSV del servidor central.
+Todas son `STRICT`. El script empieza con `PRAGMA foreign_keys = ON`. Ese PRAGMA vale por conexión.
 
-### 2.2 Política de Claves Foráneas
-SQLite no habilita claves foráneas por defecto; la arquitectura requiere la ejecución obligatoria de `PRAGMA foreign_keys = ON;` en cada sesión de conexión del cliente móvil para garantizar integridad referencial estricta.
+| Tabla | Para qué sirve | Restricciones principales |
+|---|---|---|
+| `producto_cache` | Catálogo local. | Precio en centavos enteros, `CHECK` de precio y stock >= 0, `disponible` y `eliminado` en 0 o 1. La fila no se borra: `eliminado = 1` es la lápida. |
+| `pedido_borrador` | Cabecera del pedido en la tablet. | `id_local` es un UUID en minúsculas con `CHECK`. `forma_pago` solo `EFECTIVO`, `TARJETA` o `TRANSFERENCIA`. `usuario` es un alias. |
+| `item_borrador` | Ítems del borrador. | PK `(id_local, producto_id)`, cantidad > 0, FK a `pedido_borrador` y a `producto_cache`. Guarda `precio_centavos_visto`. |
+| `cola_sync` | Solicitudes de sincronización. | `solicitud_uuid` es la PK (UUID con `CHECK`). Estado: `PENDIENTE` (por defecto), `SIMULADO_APROBADO`, `CONFLICTO` o `RECHAZADO`. Guarda `motivo`, `evaluada_en` y `snapshot_copiado_en`. |
+| `snapshot_servidor` | Copia cruda del CSV, con `filas_copia`. | Se crea con tipos antes del `.import`. La importación verifica que llegaron todas las filas. |
 
----
+No hay tabla de clientes ni datos personales.
 
-## 3. Modelo de Sincronización y Resolución de Conflictos
+## Importación
 
-### 3.1 Flujo de Exportación / Importación (Snapshot)
-1. **En PostgreSQL**: La vista `v_snapshot_movil` proyecta las columnas clave de productos y clientes aptos para movilidad. Un script exporta los datos a formato CSV estándar con cabecera.
-2. **En SQLite**: Se utiliza la tabla intermedia tipada `snapshot_servidor`. El script `importar_snapshot.sql` realiza un **UPSERT** idempotente:
-   - Nuevos registros son insertados.
-   - Registros modificados son actualizados.
-   - Los registros locales existentes que no hayan sido sincronizados con el servidor conservan sus flags y modificaciones (respeto a tumbstones y estados locales).
+El upsert pisa precio, stock y banderas con los valores del servidor. Lo que se conserva es la fila: un producto dado de baja en el servidor queda con `eliminado = 1` (lápida) y los ítems que lo referencian siguen siendo válidos.
 
-### 3.2 Lógica del Semáforo Offline (Consigna 2.b)
-El semáforo se implementa exclusivamente en SQL declarativo dentro de SQLite (`movil/semaforo.sql`):
-- Evalúa los pedidos en estado `BORRADOR`.
-- Compara la cantidad pedida contra el stock disponible en la instantánea.
-- Compara el precio acordado en el borrador contra el precio vigente en el snapshot.
-- Regla de negocio determinista (`CASE`):
-  1. Si `n_items = 0` o existen ítems sin stock suficiente (`n_rojo > 0`) -> **`RECHAZADO`**.
-  2. Si hay stock pero existen variaciones de precio en perjuicio del cliente (`n_amarillo > 0`) -> **`CONFLICTO`**.
-  3. Si todos los ítems tienen stock y el precio no aumentó -> **`SIMULADO_APROBADO`**.
+## Reglas del semáforo (por prioridad)
 
----
+Se evalúan solo las solicitudes `PENDIENTE`.
 
-## 4. Nota de Desviación de Herramientas (Kiro / OpenCode -> Claude Code + OpenSpec)
-De acuerdo a lo documentado en la Bitácora de IA y en la DUIA:
-- La cátedra sugirió originalmente el uso de Kiro y OpenCode.
-- El equipo técnico adoptó **Claude Code** asistido por la metodología de especificación formal **OpenSpec (OPSX)**.
-- Esta decisión permitió un control de versiones más granular, integración fluida con la terminal Git Bash en Windows y una trazabilidad estricta de cada requisito EARS y caso de prueba C1-C7 mediante suites automáticas en bash.
+1. Borrador sin ítems: `RECHAZADO`, motivo `borrador vacio`.
+2. Producto que no existe en la instantánea, dado de baja, no disponible, o con cantidad mayor al stock: `RECHAZADO`.
+3. Cualquier diferencia de precio (`<>`, sube o baja) y ninguna causa de rechazo: `CONFLICTO`.
+4. Todo coincide: `SIMULADO_APROBADO`.
+
+El rojo gana sobre el amarillo. El `CASE` del semáforo lo escribió una persona del equipo (modo aprendizaje).
+
+## Idempotencia
+
+- Una solicitud con UUID repetido falla por clave primaria.
+- Una solicitud ya evaluada no sale de su estado: el semáforo solo toca `PENDIENTE`. Una segunda corrida da `changes() = 0`.
+- Para aceptar un precio nuevo se crea una solicitud nueva con UUID nuevo.
+
+## Por qué PostgreSQL no se toca
+
+La tablet no escribe en el servidor. La simulación solo lee la instantánea. Un `SIMULADO_APROBADO` no es una venta: no se crea ningún pedido y el stock del servidor queda igual. Se comprobó con la línea base y la verificación final de `food_store_copia` (`evidencias/verificacion_final_diff.txt`). Las únicas escrituras en el servidor son la vista y la preparación y restauración de los casos C2 y C4, y quedan restauradas.
