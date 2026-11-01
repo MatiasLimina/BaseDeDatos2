@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html lang="es">
+<head><meta charset="UTF-8"><title>TP8 - La base de la tablet</title></head>
+<body>
+<h1>TP8 - Food Store en la feria</h1>
+<h2>1.a Qué datos viajan a la tablet</h2>
+<p>La tablet recibe una instantánea del catálogo (vista <code>v_snapshot_movil</code>, exportada a CSV). Todo lo que no se usa para armar un borrador o evaluar una solicitud se queda en el servidor.</p>
+<table border="1" cellpadding="4">
+<tr><th>Dato</th><th>Viaja</th><th>Motivo</th></tr>
+<tr><td><code>id</code></td><td>viaja</td><td>identifica el producto en el borrador</td></tr>
+<tr><td><code>nombre</code></td><td>viaja</td><td>para mostrar el catálogo sin conexión</td></tr>
+<tr><td><code>precio_centavos</code></td><td>viaja</td><td>precio actual, en enteros, para detectar conflictos</td></tr>
+<tr><td><code>stock</code></td><td>viaja</td><td>para rechazar cantidades que no alcanzan</td></tr>
+<tr><td><code>disponible</code></td><td>viaja</td><td>derivado: activo y con stock</td></tr>
+<tr><td><code>eliminado</code></td><td>viaja</td><td>derivado: producto dado de baja (lápida)</td></tr>
+<tr><td><code>copiado_en</code></td><td>viaja</td><td>fecha de la copia</td></tr>
+<tr><td><code>filas_copia</code></td><td>viaja</td><td>total esperado, para verificar la importación</td></tr>
+<tr><td><code>cliente</code> completo</td><td>no viaja</td><td>datos personales: la tablet no los necesita</td></tr>
+<tr><td><code>created_at</code>, <code>categoria_id</code></td><td>no viaja</td><td>no se usan en la tablet</td></tr>
+<tr><td>pedidos y detalles del servidor</td><td>no viaja</td><td>son las ventas; las administra solo el servidor</td></tr>
+</table>
+<p>La fuente de verdad es PostgreSQL: el precio, el stock y las ventas los decide el servidor. La tablet trabaja con una copia de solo lectura que puede estar vieja, y por eso cada solicitud se vuelve a comparar contra una instantánea nueva. Lo único que manda la tablet son sus borradores y solicitudes, y nada de eso vuelve al servidor en este TP.</p>
+<h2>2.c Casos de sincronización</h2>
+<h2>3.a Mapa de los tres motores</h2>
+<h2>3.b Plan de mantenimiento</h2>
+<h2>3.c Code review con IA</h2>
+</body>
+</html>
