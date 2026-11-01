@@ -5,7 +5,7 @@
 <h1>TP8 - Food Store en la feria</h1>
 <h2>1.a Qué datos viajan a la tablet</h2>
 <p>La tablet recibe una instantánea del catálogo (vista <code>v_snapshot_movil</code>, exportada a CSV). Todo lo que no se usa para armar un borrador o evaluar una solicitud se queda en el servidor.</p>
-<table border="1" cellpadding="4">
+<table border="1" cellpadding="4" cellspacing="0">
 <tr><th>Dato</th><th>Viaja</th><th>Motivo</th></tr>
 <tr><td><code>id</code></td><td>viaja</td><td>identifica el producto en el borrador</td></tr>
 <tr><td><code>nombre</code></td><td>viaja</td><td>para mostrar el catálogo sin conexión</td></tr>
@@ -20,9 +20,107 @@
 <tr><td>pedidos y detalles del servidor</td><td>no viaja</td><td>son las ventas; las administra solo el servidor</td></tr>
 </table>
 <p>La fuente de verdad es PostgreSQL: el precio, el stock y las ventas los decide el servidor. La tablet trabaja con una copia de solo lectura que puede estar vieja, y por eso cada solicitud se vuelve a comparar contra una instantánea nueva. Lo único que manda la tablet son sus borradores y solicitudes, y nada de eso vuelve al servidor en este TP.</p>
+
 <h2>2.c Casos de sincronización</h2>
+
 <h2>3.a Mapa de los tres motores</h2>
+<p>Cada dato del ecosistema Food Store tiene un único motor que manda (fuente de verdad). Los demás motores mantienen copias derivadas de solo lectura o directamente no almacenan el dato.</p>
+
+<table border="1" cellpadding="4" cellspacing="0">
+<thead>
+<tr>
+  <th>Dato</th>
+  <th>PostgreSQL (Central)</th>
+  <th>MongoDB (U7)</th>
+  <th>SQLite (Tablet feria)</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+  <td>Catálogo y precio actual</td>
+  <td><b>manda</b></td>
+  <td>no está <sup>1</sup></td>
+  <td>copia (solo lectura) en <code>producto_cache</code></td>
+</tr>
+<tr>
+  <td>Stock</td>
+  <td><b>manda</b></td>
+  <td>no está</td>
+  <td>copia (solo lectura) (<code>stock_visto</code>)</td>
+</tr>
+<tr>
+  <td>Pedidos confirmados (ventas)</td>
+  <td><b>manda</b></td>
+  <td>copia (solo lectura): colección <code>foodstore.pedidos</code> (se regenera desde PostgreSQL)</td>
+  <td>no está</td>
+</tr>
+<tr>
+  <td>Estado del pedido</td>
+  <td><b>manda</b> (<code>pedido.estado</code> en <code>foodstore</code>)</td>
+  <td>copia (solo lectura)</td>
+  <td>no está</td>
+</tr>
+<tr>
+  <td>Clientes y datos personales</td>
+  <td><b>manda</b></td>
+  <td>copia (solo lectura) del subconjunto esencial dentro del pedido <sup>2</sup></td>
+  <td>no está (nunca viajan a la tablet)</td>
+</tr>
+<tr>
+  <td>Instantánea CSV (<code>snapshot_servidor</code>)</td>
+  <td><b>manda</b> (vista <code>v_snapshot_movil</code>)</td>
+  <td>no está</td>
+  <td>copia (solo lectura)</td>
+</tr>
+<tr>
+  <td>Borradores (<code>pedido_borrador</code>, <code>item_borrador</code>)</td>
+  <td>no está</td>
+  <td>no está</td>
+  <td><b>manda</b></td>
+</tr>
+<tr>
+  <td>Solicitudes de sincronización (<code>cola_sync</code>)</td>
+  <td>no está</td>
+  <td>no está</td>
+  <td><b>manda</b> (la sincronización solo se simula)</td>
+</tr>
+<tr>
+  <td>Resultado del semáforo</td>
+  <td>no está</td>
+  <td>no está</td>
+  <td><b>manda</b> (simulación local; <code>SIMULADO_APROBADO</code> nunca es una venta)</td>
+</tr>
+</tbody>
+</table>
+
+<p><small>
+<sup>1</sup> Cada línea en MongoDB conserva el <code>precio_unitario</code> histórico del momento de la venta, no el precio actual del catálogo.<br>
+<sup>2</sup> En MongoDB se embeben los datos esenciales de cliente y producto; teléfono, dirección, activo, precio actual y stock no se embeben y pertenecen exclusivamente a PostgreSQL.
+</small></p>
+
+<p><strong>Nota de origen:</strong> MongoDB contiene 9 pedidos / 31 líneas migrados desde la base <code>foodstore</code> (TP7, que incluye <code>pedido.estado</code>); por su parte, la tablet trabaja sobre <code>food_store_copia</code>, copia de pruebas sin columna <code>estado</code>.</p>
+
+<pre>
+Flujo entre motores:
+PostgreSQL (food_store_copia) ──[ v_snapshot_movil ]──► \copy ──► servidor_snapshot.csv ──► .import ──► SQLite (tablet)
+PostgreSQL (foodstore) ─────────[ migracion TP7 ]──────► insertMany ──────────────────────────────────► MongoDB (pedidos)
+SQLite (tablet) ────────────────[ X ]─────────────────► no vuelve nada al servidor (cola_sync solo simula)
+</pre>
+
 <h2>3.b Plan de mantenimiento</h2>
+<p>El plan extiende el mantenimiento de la Unidad 6 (respaldo diario de PostgreSQL y prueba semanal) sin modificar el TP6:</p>
+<ul>
+  <li><strong>Qué se respalda y restauración:</strong>
+    <ul>
+      <li><em>PostgreSQL:</em> Respaldo lógico diario con <code>pg_dump</code> y prueba de restauración semanal en servidor aislado.</li>
+      <li><em>MongoDB:</em> No se respalda de forma autónoma. Se regenera desde PostgreSQL ejecutando la migración del TP7 (<code>insertMany</code>).</li>
+      <li><em>SQLite:</em> Respaldo en caliente al cierre de cada jornada de feria con <code>VACUUM INTO 'respaldo_jornada_YYYYMMDD.db'</code>. La prueba de restauración se realiza semanalmente comprobando <code>PRAGMA integrity_check</code> y conteos en las cuatro tablas.</li>
+    </ul>
+  </li>
+  <li><strong>Contingencia ante restauración de respaldo viejo de PostgreSQL:</strong> Las tablets no confían en su caché ni en resultados simulados previos. Invalidan <code>snapshot_servidor</code>, descargan una instantánea fresca con <code>copiado_en</code> posterior a la restauración del servidor y reevalúan las solicitudes <code>PENDIENTE</code> con el semáforo.</li>
+  <li><strong>Revisión periódica:</strong> Al cierre de cada jornada de feria (y antes de la siguiente sincronización), el <strong>Encargado del Food Truck</strong> revisa las solicitudes en <code>CONFLICTO</code> (para actualizar precio visto o desistir) y en <code>RECHAZADO</code> (para registrar mermas o anular).</li>
+</ul>
+
 <h2>3.c Code review con IA</h2>
 </body>
 </html>
