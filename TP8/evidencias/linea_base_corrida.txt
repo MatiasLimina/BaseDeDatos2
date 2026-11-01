@@ -1,0 +1,5 @@
+medido_en=2026-11-01 20:06:12.275759-03
+productos=50005
+suma_stock=5012740
+pedidos=200002
+huella_producto=3dfee1ff028ef5863c9e1890c7fb4aa1

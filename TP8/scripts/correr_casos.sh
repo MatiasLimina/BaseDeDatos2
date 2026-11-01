@@ -8,17 +8,31 @@ export PATH="$PATH:/d/DevTools/PosgresSQL/bin:/d/DevTools/PostgreSQL/bin:/d/DevT
 export PGCLIENTENCODING=UTF8
 
 RAIZ="$(cd "$(dirname "$0")/.." && pwd)"
+# \copy y \i usan rutas relativas a TP8/: se corre siempre desde ahi.
+cd "$RAIZ"
 DB="$RAIZ/movil/foodstore_movil.db"
 EVID="$RAIZ/evidencias"
 P="psql -X -w -h localhost -U postgres -d food_store_copia -v ON_ERROR_STOP=1"
 
 mkdir -p "$EVID"
 
-# Trap para restaurar PostgreSQL si el script se interrumpe
-trap 'echo "AVISO: Restaurando PostgreSQL tras interrupcion..."; $P -f "$RAIZ/sql/casos/restaurar_casos.sql" > /dev/null 2>&1 || true' ERR
+# Metricas comparables de una linea base: sin comentarios ni la hora de medicion, y
+# ordenadas (UNION ALL no garantiza el orden de las filas: se vio a pedidos= salir ultimo).
+metricas() { grep -v -e '^#' -e '^medido_en=' "$1" | sort; }
+
+# Restaurar PostgreSQL ante cualquier salida con error, incluido Ctrl+C
+# (un trap ERR solo no se dispara con una interrupcion).
+trap 'exit 130' INT TERM
+trap 'rc=$?; if [ "$rc" -ne 0 ]; then echo "AVISO: restaurando PostgreSQL tras error o interrupcion (rc=$rc)..."; $P -f sql/casos/restaurar_casos.sql > /dev/null 2>&1 || true; fi' EXIT
 
 echo "=== 0. Linea base de PostgreSQL ==="
-$P -At -f "$RAIZ/sql/linea_base.sql" > "$EVID/linea_base.txt"
+# evidencias/linea_base.txt es la referencia limpia (tomada antes de tocar la base).
+# Si la base actual no coincide, una corrida anterior la dejo modificada: no se sigue.
+$P -At -f sql/linea_base.sql > "$EVID/linea_base_corrida.txt"
+if ! diff <(metricas "$EVID/linea_base.txt") <(metricas "$EVID/linea_base_corrida.txt"); then
+  echo "ERROR: food_store_copia no coincide con la linea base de referencia; correr sql/casos/restaurar_casos.sql y revisar" >&2
+  exit 1
+fi
 
 echo "=== 1. Crear vista y exportar instantanea inicial S0 ==="
 $P -f "$RAIZ/sql/01_v_snapshot_movil.sql" > /dev/null
@@ -63,6 +77,11 @@ sqlite3 "$DB" < "$RAIZ/movil/semaforo.sql" > "$EVID/c4_rechazado.txt" 2>&1
 echo "=== 9. Restauracion de PostgreSQL y verificacion final ==="
 $P -f "$RAIZ/sql/casos/restaurar_casos.sql" > "$EVID/restaurar_casos.txt" 2>&1
 $P -At -f "$RAIZ/sql/verificacion_final.sql" > "$EVID/verificacion_final.txt" 2>&1
+if diff <(metricas "$EVID/linea_base.txt") <(metricas "$EVID/verificacion_final.txt") > "$EVID/verificacion_final_diff.txt"; then
+  echo "verificacion_final: PostgreSQL igual a la linea base (pedidos, stock y huella)" | tee -a "$EVID/verificacion_final_diff.txt"
+else
+  echo "ERROR: PostgreSQL quedo distinto de la linea base, ver evidencias/verificacion_final_diff.txt" >&2
+  exit 1
+fi
 
-trap - ERR
 echo "=== Secuencia de casos completada exitosamente ==="
