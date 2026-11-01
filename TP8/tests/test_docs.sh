@@ -42,9 +42,10 @@ grep -i -q "Kiro" "$DUIA" && grep -i -q "OpenCode" "$DUIA" || falla "DUIA.md no 
 
 # 5. Extension del informe PDF (si existe)
 if [ -f "$PDF" ]; then
+  PDF_WIN="$(cygpath -m "$PDF")"
   python -c "
 import pypdf, sys
-reader = pypdf.PdfReader('$PDF')
+reader = pypdf.PdfReader('$PDF_WIN')
 n = len(reader.pages)
 print(f'informe.pdf: {n} pagina(s)')
 if n > 6:
