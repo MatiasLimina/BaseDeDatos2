@@ -191,8 +191,8 @@ El subagente de Claude de solo lectura emitió el siguiente dictamen técnico:
 | **SEC-02** | TP7: `tests/test_migracion.sh` | Seguridad | **Aceptado** | Restringido al script de test local; se recomienda validar que `$ids_csv` contenga solo dígitos y comas. |
 | **CORR-01** | TP8: `movil/semaforo.sql` | Correctitud | **Descartado con fundamento** | En la tablet offline la evaluación es una **simulación local**, no una venta confirmada ni reserva de stock. Controlar el stock entre varias ventas le corresponde al servidor al confirmar la venta, fuera del TP8. Ver sección 5. |
 | **CORR-02** | TP7: `consultas_postgresql.sql` | Rendimiento | **Aceptado** | Medido con `EXPLAIN ANALYZE`: el filtro temprano baja de 621.201 filas y 2.621 buffers a 12 filas y 64 buffers, con el mismo resultado. Ver sección 5. |
-| **CORR-03** | TP8: `scripts/correr_casos.sh` | Correctitud | **Descartado con refutación** | La carpeta en el disco del host está instalada literalmente como `D:\DevTools\PosgresSQL`. Modificarla hubiera roto la ejecución en este entorno. Se agregaron ambas rutas para portabilidad. Ver sección 5. |
-| **INTEG-01** | TP8: `movil/schema_sqlite.sql` | Integridad | **Aceptado** | SQLite no persiste el pragma de claves foráneas por archivo; se documenta como requisito contractual para cualquier cliente externo. |
+| **CORR-03** | TP8: `scripts/correr_casos.sh` | Correctitud | **Descartado con refutación** | La carpeta en el disco del host está instalada literalmente como `D:\DevTools\PosgresSQL`. Modificarla hubiera roto la ejecución en este entorno. Se agregaron ambas rutas para portabilidad (`evidencias/code_review_3.txt`). |
+| **INTEG-01** | TP8: `movil/schema_sqlite.sql` | Integridad | **Aceptado** | Comprobado en la base: sin el PRAGMA se acepta un ítem de un producto inexistente; con él, falla. Todos los scripts de `movil/` ya lo activan. Ver sección 5. |
 | **INTEG-02** | TP1–TP6: `pedido_detalle` | Integridad | **Aceptado (histórico)** | Falta de restricción `CHECK` o columna generada en el esquema original. No se modifica el repo `BaseDeDatos2` por ser externo y cerrado. |
 | **INTEG-03** | TP3–TP4: `generar_registros_adaptado.sql` | Integridad / Calidad | **Aceptado (histórico)** | Sesgo sintético severo hacia el cliente 4812. Se documenta como lección aprendida para pruebas de carga. No se modifica el repo externo. |
 | **INTEG-04** | TP8: `movil/schema_sqlite.sql` | Integridad | **Aceptado (fortaleza)** | Excelente práctica de validación canónica de UUIDs en modo STRICT. |
@@ -217,10 +217,6 @@ El subagente de Claude de solo lectura emitió el siguiente dictamen técnico:
 * **Decisión:** **ACEPTADO** (como recomendación; `consultas_postgresql.sql` es del TP7 y no se modificó).
 * **Comprobación en la base:** `EXPLAIN (ANALYZE, BUFFERS)` de la consulta d) en `food_store_copia`, con `scripts/medir_corr02.sql`. Salida completa en [`evidencias/code_review_2_explain.txt`](../evidencias/code_review_2_explain.txt) y resumen en [`evidencias/code_review_2.txt`](../evidencias/code_review_2.txt). Se usó la copia porque el TP8 solo puede usar esa base y la `foodstore` del TP7 no existe en esta máquina; la consulta se midió sin `pedido.estado`, que la copia no tiene y la vista no usa.
 
-### Hallazgo 3 (TP8): [CORR-03] Supuesto error tipográfico en ruta `PosgresSQL`
-* **Descripción de la IA:** La IA afirmó que la ruta `/d/DevTools/PosgresSQL/bin` contenía una errata tipográfica (falta de la letra `t`) que causaría fallos en la ejecución de scripts.
-* **Decisión:** **DESCARTADO con refutación en el sistema de archivos**.
-* **Comprobación empírica:** Registrada en [`evidencias/code_review_3.txt`](../evidencias/code_review_3.txt). Al inspeccionar el directorio físico del host (`D:\DevTools\`), se comprobó que el directorio de instalación real se llama exactamente `PosgresSQL`. Modificarlo a ciegas hubiera roto la ejecución en la máquina del usuario. Para maximizar la portabilidad sin romper el entorno, se configuraron ambas variantes en el `PATH`.
   | | Vista original | Con filtro temprano |
   |---|---|---|
   | Filas de `pedido_detalle` | 621.201 | 12 |
@@ -229,4 +225,14 @@ El subagente de Claude de solo lectura emitió el siguiente dictamen técnico:
 
   Las dos versiones devuelven el mismo pedido (10167).
 * **Lo que no coincidía:** la IA había dado ~24.000 → 18 buffers, ~85 → < 0,2 ms y un Index Scan sobre `pk_pedido_detalle`, sin ningún `EXPLAIN` que lo respalde; el plan real usa `idx_detalle_subtotal`. Sus 621.853 filas y 31 filas pueden corresponder a la `foodstore` del TP7, que no está en esta máquina; en la copia son 621.201 y 12. El diagnóstico (PostgreSQL no lleva la condición del JOIN a través del `GROUP BY`) sí era correcto.
+
+### Hallazgo 3 (TP8): [INTEG-01] Claves foráneas que SQLite no hace cumplir por defecto
+* **Descripción de la IA:** `PRAGMA foreign_keys = ON;` debe ejecutarse en cada conexión; no queda guardado en el archivo `.db`.
+* **Decisión:** **ACEPTADO** (ya mitigado).
+* **Comprobación en la base:** Registrada en [`evidencias/code_review_integ01.txt`](../evidencias/code_review_integ01.txt), generada por `scripts/demo_pragma_fk.sh` sobre una base temporal creada con `movil/schema_sqlite.sql`:
+  1. Conexión sin el PRAGMA (`foreign_keys = 0`): insertar en `item_borrador` un `producto_id = 999999`, que no existe en `producto_cache`, funciona (`changes() = 1`). Solo `PRAGMA foreign_key_check` detecta el huérfano después.
+  2. Conexión con el PRAGMA (`foreign_keys = 1`): la misma inserción falla con `FOREIGN KEY constraint failed` y no queda ninguna fila.
+  3. Mitigación: la misma evidencia lista la primera sentencia SQL de cada script de `movil/`, y en todos es `PRAGMA foreign_keys = ON;`. Cualquier cliente nuevo que abra la base tiene que hacer lo mismo.
+
+CORR-03 sigue en la tabla como descartado: la carpeta del host se llama literalmente `PosgresSQL` (`evidencias/code_review_3.txt`). No se desarrolla aquí porque se comprobó en el disco y no en la base.
 
