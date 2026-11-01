@@ -28,6 +28,27 @@ n_prueba=$(grep -E -c "Se prueba con: C[1-7]" "$REQ" || true)
 [ "$n_shall" -ge 4 ] || falla "requirements.md tiene menos de 4 clausulas THE SYSTEM SHALL (tiene $n_shall)"
 [ "$n_prueba" -ge 4 ] || falla "requirements.md tiene menos de 4 clausulas 'Se prueba con: C' (tiene $n_prueba)"
 
+# 2b. Rutas citadas en docs/kiro/*.md deben existir
+for f in "$REQ" "$DES" "$TSK"; do
+  for ruta in $(grep -E -o "(evidencias|movil/casos)/[A-Za-z0-9_.]+" "$f" | sort -u); do
+    [ -e "$RAIZ/$ruta" ] || falla "$(basename "$f") cita '$ruta' y no existe"
+  done
+done
+
+# 2c. Nada de tablas ni motivos inventados
+for f in "$REQ" "$DES" "$TSK"; do
+  if grep -i -E -q "(clientes|items_pedido|sincronizado_servidor)" "$f"; then
+    falla "$(basename "$f") menciona una tabla que no existe (clientes, items_pedido o sincronizado_servidor)"
+  fi
+  if grep -i -E -q "Stock insuficiente|Producto discontinuado|Pedido sin ítems|Pedido sin items" "$f"; then
+    falla "$(basename "$f") cita un motivo inventado que semaforo.sql no genera"
+  fi
+  # 2d. La tablet no descuenta stock ni inserta en PostgreSQL
+  if grep -i -E -q "descuent[ao].{0,40}stock|inserci[oó]n definitiva|inserta.{0,40}PostgreSQL" "$f"; then
+    falla "$(basename "$f") dice que la tablet descuenta stock o inserta en PostgreSQL"
+  fi
+done
+
 # 3. Bitacora de IA: al menos 3 entradas y al menos un descarte
 [ -f "$BIT" ] || falla "docs/bitacora_ia.md no existe"
 n_entradas=$(grep -E -c "^\| [0-9]+ \|" "$BIT" || true)
