@@ -36,9 +36,9 @@ La inteligencia artificial fue empleada en las siguientes tareas específicas:
 
 ---
 
-## 3. Rol Humano: Supervisión Crítica (Modelo CASE)
+## 3. Rol Humano: qué hizo el equipo
 
-De acuerdo a las pautas éticas y académicas de la cátedra, el equipo humano mantuvo el control absoluto de las decisiones de diseño, actuando bajo el modelo **CASE** (*Control, Análisis, Supervisión y Evaluación*).
+El equipo tomó las decisiones de diseño (dónde vive el TP, cómo se derivan `disponible` y `eliminado`, el alcance del code review, qué filas lleva el mapa) y aprobó cada cambio sobre la copia del servidor antes de ejecutarlo. La expresión `CASE` del semáforo (`movil/semaforo.sql`: rojo, amarillo, verde) la escribió el integrante humano; la IA dejó el andamiaje y el test, y después solo la revisó.
 
 La intervención de la IA nunca fue aceptada acríticamente. Como evidencia de supervisión humana efectiva, se destacan los siguientes descartes técnicos fundamentados:
 - **Descarte de CORR-01 (Aprobación fantasma de stock)**: La IA sugirió erróneamente que la tablet no podía emitir `SIMULADO_APROBADO` sin decrementar stock. El criterio humano prevaleció: en una arquitectura *offline-first*, la tablet únicamente simula la factibilidad sobre su instantánea local; la verdadera reserva atómica y bloqueo transaccional concurrente ocurren en PostgreSQL durante la sincronización definitiva.
