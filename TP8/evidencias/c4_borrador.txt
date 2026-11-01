@@ -15,7 +15,7 @@ COMMIT;
 -- Verificacion del borrador de C4 insertado:
 SELECT id_local, usuario, forma_pago, fecha FROM pedido_borrador WHERE id_local = 'c4000000-0000-4000-8000-000000000001';
 id_local|usuario|forma_pago|fecha
-c4000000-0000-4000-8000-000000000001|vendedor_feria_1|EFECTIVO|2026-11-01T23:06:17Z
+c4000000-0000-4000-8000-000000000001|vendedor_feria_1|EFECTIVO|2026-11-01T23:14:11Z
 SELECT id_local, producto_id, cantidad, precio_centavos_visto FROM item_borrador WHERE id_local = 'c4000000-0000-4000-8000-000000000001';
 id_local|producto_id|cantidad|precio_centavos_visto
 c4000000-0000-4000-8000-000000000001|3|2|180000

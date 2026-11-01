@@ -114,8 +114,8 @@
 
 ## 12. Integración y cierre
 
-- [ ] 12.1 Reconstrucción desde cero: borrar `movil/foodstore_movil.db`, seguir el README de punta a punta (incluida la parte [PG-escritura]) y ejecutar todos los `tests/test_*.sh` → todos `OK`; la verificación final de PostgreSQL coincide con la línea base. Registrar la tabla de resultados en `evidencias/reconstruccion_desde_cero.txt`.
-- [ ] 12.2 Verificar por MCP que `food_store_copia` está en la línea base (pedidos, `sum(stock)`, huella) y que la única diferencia de esquema es `v_snapshot_movil`; verificar que no hay datos personales reales en el `.db` (`SELECT DISTINCT usuario FROM pedido_borrador` solo devuelve alias inventados).
+- [x] 12.1 Reconstrucción desde cero: borrar `movil/foodstore_movil.db`, seguir el README de punta a punta (incluida la parte [PG-escritura]) y ejecutar todos los `tests/test_*.sh` → todos `OK`; la verificación final de PostgreSQL coincide con la línea base. Registrar la tabla de resultados en `evidencias/reconstruccion_desde_cero.txt`.
+- [x] 12.2 Verificar por MCP que `food_store_copia` está en la línea base (pedidos, `sum(stock)`, huella) y que la única diferencia de esquema es `v_snapshot_movil`; verificar que no hay datos personales reales en el `.db` (`SELECT DISTINCT usuario FROM pedido_borrador` solo devuelve alias inventados).
 - [ ] 12.3 CHECKPOINT (orquestador): consultar al `advisor` (FINAL_DIFF) sobre `git diff` antes de declarar cerrado el apply; resolver o exponer sus observaciones.
-- [ ] 12.4 Ejecutar `openspec validate tp8-tablet-sqlite-sync --strict` → sin errores.
+- [x] 12.4 Ejecutar `openspec validate tp8-tablet-sqlite-sync --strict` → sin errores.
 - [ ] 12.5 Con confirmación explícita del usuario, el orquestador crea la etiqueta `tp8` sobre el commit final en el repo del TP7 (`nicolasmonjelardi/BaseDeDatos2-TP7-NoSQL`), donde vive `TP8/` (y el `push` si el usuario lo pide: requiere permiso de escritura en ese repo); verificar con `git tag --list tp8`.

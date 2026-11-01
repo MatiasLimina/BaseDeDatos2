@@ -63,9 +63,13 @@ cp "$D/$DB" "$TMP_C1/cat.db"
 cat_filas="$(sqlite3 -readonly "$TMP_C1/cat.db" "SELECT id, nombre, precio_centavos, stock_visto FROM producto_cache WHERE disponible = 1 AND eliminado = 0 ORDER BY id;" | tr -d '\r')"
 [ -n "$cat_filas" ] || falla "C1: la consulta del catalogo disponible no devolvio filas"
 
-# Ningun producto no disponible o eliminado debe figurar
-disp_invalido="$(sqlite3 -readonly "$TMP_C1/cat.db" "SELECT count(*) FROM producto_cache WHERE disponible = 1 AND eliminado = 0 AND (disponible <> 1 OR eliminado <> 0);" | tr -d '\r')"
-[ "$disp_invalido" = "0" ] || falla "C1: se devolvieron productos con disponible <> 1 o eliminado <> 0"
+# El filtro tiene que dejar afuera algo (si no, no se esta probando) y el catalogo
+# mas los excluidos tiene que dar el total: nada se pierde ni se cuela.
+n_cat="$(echo "$cat_filas" | grep -c .)"
+n_excl="$(sqlite3 -readonly "$TMP_C1/cat.db" "SELECT count(*) FROM producto_cache WHERE disponible = 0 OR eliminado = 1;" | tr -d '\r')"
+n_tot="$(sqlite3 -readonly "$TMP_C1/cat.db" "SELECT count(*) FROM producto_cache;" | tr -d '\r')"
+[ "$n_excl" -gt 0 ] || falla "C1: la base de prueba no tiene productos excluidos, el filtro no se ejercita"
+[ $((n_cat + n_excl)) -eq "$n_tot" ] || falla "C1: catalogo ($n_cat) + excluidos ($n_excl) <> total ($n_tot)"
 echo "$cat_filas" | grep -q "^2|" && falla "C1: producto sin stock (id 2) figura en el catalogo disponible"
 echo "$cat_filas" | grep -q "^5|" && falla "C1: producto eliminado (id 5) figura en el catalogo disponible"
 rm -rf "$TMP_C1"

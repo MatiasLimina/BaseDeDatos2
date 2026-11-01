@@ -71,10 +71,17 @@ SELECT count(*) AS n_cola_despues_rollback FROM cola_sync;
 --    eliminado = 0) leyendo exclusivamente de su base local SQLite.
 -- ============================================================================
 
+-- Para que la evidencia sea legible: el total del catalogo disponible y las
+-- primeras 10 filas (la consulta completa es la misma sin el LIMIT).
+SELECT count(*) AS productos_en_catalogo
+FROM producto_cache
+WHERE disponible = 1 AND eliminado = 0;
+
 SELECT id, nombre, precio_centavos, stock_visto
 FROM producto_cache
 WHERE disponible = 1 AND eliminado = 0
-ORDER BY id;
+ORDER BY id
+LIMIT 10;
 
 -- ============================================================================
 -- 4. Caso C7: Datos invalidos no dejan filas nuevas (.bail off para ver errores).
