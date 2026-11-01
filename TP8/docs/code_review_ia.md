@@ -189,7 +189,7 @@ El subagente de Claude de solo lectura emitió el siguiente dictamen técnico:
 |---|---|---|---|---|
 | **SEC-01** | TP7: `migracion/generar_insert_pedidos.sql` | Seguridad | **Descartado (como riesgo) / Aceptado (como higiene)** | `p.estado` y `p.forma_pago` provienen de tipos `ENUM` de PostgreSQL estrictamente alfanuméricos en mayúsculas (`PENDIENTE`, `EFECTIVO`, etc.), siendo imposible inyectar código. |
 | **SEC-02** | TP7: `tests/test_migracion.sh` | Seguridad | **Aceptado** | Restringido al script de test local; se recomienda validar que `$ids_csv` contenga solo dígitos y comas. |
-| **CORR-01** | TP8: `movil/semaforo.sql` | Correctitud | **Descartado con fundamento** | En la tablet offline la evaluación es una **simulación local**, no una venta confirmada ni reserva de stock. La consistencia y prevención de sobreventa ocurren en PostgreSQL al confirmar. Ver sección 5. |
+| **CORR-01** | TP8: `movil/semaforo.sql` | Correctitud | **Descartado con fundamento** | En la tablet offline la evaluación es una **simulación local**, no una venta confirmada ni reserva de stock. Controlar el stock entre varias ventas le corresponde al servidor al confirmar la venta, fuera del TP8. Ver sección 5. |
 | **CORR-02** | TP7: `consultas_postgresql.sql` | Rendimiento | **Aceptado** | Filtrar tempranamente por los 9 pedidos migrados reduce el escaneo de 621.853 filas a 31 filas (aceleración > 400x). Ver sección 5. |
 | **CORR-03** | TP8: `scripts/correr_casos.sh` | Correctitud | **Descartado con refutación** | La carpeta en el disco del host está instalada literalmente como `D:\DevTools\PosgresSQL`. Modificarla hubiera roto la ejecución en este entorno. Se agregaron ambas rutas para portabilidad. Ver sección 5. |
 | **INTEG-01** | TP8: `movil/schema_sqlite.sql` | Integridad | **Aceptado** | SQLite no persiste el pragma de claves foráneas por archivo; se documenta como requisito contractual para cualquier cliente externo. |
@@ -210,7 +210,7 @@ El subagente de Claude de solo lectura emitió el siguiente dictamen técnico:
 * **Comprobación y refutación empírica:** Registrada en [`evidencias/code_review_1.txt`](../evidencias/code_review_1.txt). Se comprobó en SQLite que ambas solicitudes simulan aprobado, pero esto responde estrictamente al modelo de consistencia eventual de la aplicación:
   1. Cada tablet opera desconectada y monousuario en la feria; el semáforo es solo una **propuesta de simulación**, nunca una venta ni reserva de inventario.
   2. Si la tablet descontara stock localmente sin comunicación bidireccional, múltiples tablets generarían inventarios locales divergentes y falsas sensaciones de stock.
-  3. La deducción real de stock y la protección ante sobreventa ocurren atómicamente en el servidor central PostgreSQL al momento de confirmar pedidos.
+  3. Controlar el stock entre varias ventas le corresponde al servidor cuando la venta se confirme. Eso queda fuera del TP8: la tablet nunca escribe en PostgreSQL.
 
 ### Hallazgo 2 (TP7): [CORR-02] Agrupación sobre tabla completa en vista comparativa
 * **Descripción de la IA:** En `consultas_postgresql.sql`, `CREATE TEMP VIEW pedido_total` agrega las 621.853 filas de `pedido_detalle` antes de emparejar con los 9 pedidos de la muestra de MongoDB.

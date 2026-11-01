@@ -9,7 +9,8 @@ Resultado en SQLite:
 Fundamento del descarte:
 1. En la tablet cada borrador se evalua de forma aislada porque SIMULADO_APROBADO
    no es una venta confirmada ni reserva stock en el servidor (consistencia eventual).
-2. La deduccion real y la prevencion de sobreventa ocurren con bloqueo atomico en PostgreSQL
-   al sincronizar. Pretender descontar stock localmente en modo desconectado entre multiples
-   tablets crearia una falsa sensacion de reserva que no existe en el negocio de la feria.
+2. Controlar el stock entre varias ventas le corresponde al servidor cuando la venta se
+   confirme, y eso queda fuera del TP8 (la tablet nunca escribe en PostgreSQL). Descontar
+   stock en una tablet desconectada daria inventarios distintos en cada tablet y una
+   reserva que no existe.
 Decision: DESCARTADO con fundamento comprobable.
