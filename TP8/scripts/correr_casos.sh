@@ -84,4 +84,9 @@ else
   exit 1
 fi
 
+echo "=== 10. Reexportar S0 con el servidor restaurado ==="
+# Sin esto el CSV entregado queda con la instantanea de C4. Solo se exporta: la .db no se
+# reimporta, asi conserva cola_sync con los resultados y la lapida del producto 3 (C4).
+$P -f "$RAIZ/sql/02_exportar_snapshot.sql" > /dev/null
+
 echo "=== Secuencia de casos completada exitosamente ==="

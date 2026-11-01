@@ -23,6 +23,11 @@ El TP vive en la carpeta `TP8/` del repositorio del TP7, rama `tp8`, etiqueta `t
 
 La base de la tablet ya armada es [`movil/foodstore_movil.db`](movil/foodstore_movil.db). Las salidas de cada paso están en [`evidencias/`](evidencias/).
 
+Al terminar `scripts/correr_casos.sh`, los dos archivos de `movil/` quedan en momentos distintos, a propósito:
+
+- `servidor_snapshot.csv` es S0 exportada de nuevo con el servidor ya restaurado: coincide con `food_store_copia`.
+- `foodstore_movil.db` es la tablet después del último caso: `cola_sync` tiene los resultados de C2 a C6, y `snapshot_servidor` y `producto_cache` son los de C4 (producto 1 a 299000 y producto 3 como lápida, `eliminado = 1`). No se reimporta S0 para no borrar esa lápida.
+
 **Desvío de herramientas.** La consigna pide Kiro y OpenCode. Se usaron Claude Code y OpenSpec: la spec se escribió y commiteó antes que el código, y `docs/kiro/` se derivó de ella. Ver [`docs/DUIA.md`](docs/DUIA.md).
 
 ## Requisitos
