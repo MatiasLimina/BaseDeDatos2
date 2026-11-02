@@ -1,8 +1,8 @@
 # TP8 — Food Store en la feria: la base de la tablet y el cierre de la capa de datos
 
-TP Unidad 8 de Bases de Datos II. El food truck vende en una feria sin señal. La tablet tiene una base SQLite donde solo consulta el catálogo y arma borradores; la sincronización con PostgreSQL se **simula** con un semáforo. **El móvil propone, el servidor dispone**: precio, stock y ventas los decide PostgreSQL, y `SIMULADO_APROBADO` no es una venta.
+**Integrantes:** Matias Limina, Nicolas Monjelardi y Lautaro Aguero.
 
-Integrantes: Matias Limina - Nicolas Monjelardi - Lautaro Aguero.
+TP Unidad 8 de Bases de Datos II. El food truck vende en una feria sin señal. La tablet tiene una base SQLite donde solo consulta el catálogo y arma borradores; la sincronización con PostgreSQL se **simula** con un semáforo. **El móvil propone, el servidor dispone**: precio, stock y ventas los decide PostgreSQL, y `SIMULADO_APROBADO` no es una venta.
 
 El TP vive en la carpeta `TP8/` del repositorio del TP7, rama `tp8`, etiqueta `tp8`.
 
