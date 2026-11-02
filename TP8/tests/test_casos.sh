@@ -12,6 +12,13 @@ q() { sqlite3 "$DB" "$1" | tr -d '\r'; }
 # 1. Comprobar que la base SQLite de la tablet existe
 [ -f "$DB" ] || falla "movil/foodstore_movil.db no existe (ejecutar scripts/correr_casos.sh)"
 
+# 1b. Evidencias de S0: la importacion inicial deja 50 005 filas con 2 dadas de baja,
+# y snapshot_s0.txt anota la fecha de copia de esa instantanea.
+grep -q "^producto_cache=50005 eliminados=2$" "$EVID/importacion_s0.txt" 2>/dev/null \
+  || falla "evidencias/importacion_s0.txt no muestra producto_cache=50005 eliminados=2"
+grep -E -q "^copiado_en=[0-9]{4}-[0-9]{2}-[0-9]{2}T" "$EVID/snapshot_s0.txt" 2>/dev/null \
+  || falla "evidencias/snapshot_s0.txt no anota copiado_en de S0"
+
 # 2. Caso C5: SIMULADO_APROBADO
 c5_estado="$(q "SELECT estado FROM cola_sync WHERE solicitud_uuid='c5000000-0000-4000-8000-000000000002'")"
 [ "$c5_estado" = "SIMULADO_APROBADO" ] || falla "C5: se esperaba SIMULADO_APROBADO, es $c5_estado"

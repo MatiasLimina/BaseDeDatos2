@@ -37,11 +37,16 @@ fi
 echo "=== 1. Crear vista y exportar instantanea inicial S0 ==="
 $P -f "$RAIZ/sql/01_v_snapshot_movil.sql" > /dev/null
 $P -f "$RAIZ/sql/02_exportar_snapshot.sql" > /dev/null
+s0_copia() { sed -n '2p' "$RAIZ/movil/servidor_snapshot.csv" | tr -d '\r' | awk -F, '{print $(NF-1)}'; }
+echo "copiado_en=$(s0_copia)" > "$EVID/snapshot_s0.txt"
 
 echo "=== 2. Inicializar SQLite con schema e importar S0 ==="
 rm -f "$DB"
 sqlite3 "$DB" < "$RAIZ/movil/schema_sqlite.sql"
+# importar_snapshot.sql no imprime nada si sale bien: se agregan los conteos como evidencia.
 sqlite3 "$DB" < "$RAIZ/movil/importar_snapshot.sql" > "$EVID/importacion_s0.txt" 2>&1
+sqlite3 "$DB" "SELECT 'producto_cache=' || count(*) || ' eliminados=' || sum(eliminado) FROM producto_cache;" \
+  | tr -d '\r' >> "$EVID/importacion_s0.txt"
 
 echo "=== 3. Pruebas de la tablet (C1, C7 y borrador C5) ==="
 # .bail off dentro de pruebas_sqlite.sql captura los errores de C7
