@@ -31,11 +31,11 @@
 - [x] 3.1 RED: escribir `tests/test_vista_snapshot.sh` (solo lectura sobre `food_store_copia`): la vista existe con las columnas `id, nombre, precio_centavos, stock, disponible, eliminado, copiado_en, filas_copia` en ese orden; `disponible`/`eliminado` ∈ {0,1}; ninguna columna nula; `count(*)` = `count(*)` de `producto` = `filas_copia`; los 2 inactivos tienen `eliminado = 1, disponible = 0`; un activo con stock 0 tiene `disponible = 0, eliminado = 0`; `precio_centavos = round(precio*100)` para todos; una sola `copiado_en` distinta; y que el conjunto de tablas/columnas de `information_schema.columns` de tablas base no cambió respecto de `evidencias/esquema_servidor_antes.txt`. Ejecutar → falla porque la vista no existe.
 - [x] 3.2 Guardar `evidencias/esquema_servidor_antes.txt` (tablas base y columnas, por MCP o psql) y escribir `sql/linea_base.sql` (pedidos, `sum(stock)`, huella md5 de `producto` según design.md Decisión 8, y `now()` como fecha de la medición). Ejecutarlo y guardar `evidencias/linea_base.txt`; verificar que da 200 002 pedidos y 5 012 740 de stock.
 - [x] 3.3 GREEN: escribir `sql/01_v_snapshot_movil.sql` (guarda `current_database() = 'food_store_copia'`, `CREATE OR REPLACE VIEW` según design.md Decisión 3, comentario que explica cada columna derivada). **[PG-escritura]** ejecutarlo; ejecutar el test → `test_vista_snapshot: OK`.
-  - Pendiente: ejecutar humano (script escrito en `sql/01_v_snapshot_movil.sql`; SELECT validado por MCP: 50 005 filas, 2 eliminados, 111 activos sin stock, tipos bigint/integer, una sola `copiado_en`).
+  - Hecho: `scripts/correr_casos.sh` (paso 1) crea la vista; `test_vista_snapshot: OK` (50 005 filas, 2 eliminados, 111 activos sin stock, una sola `copiado_en`).
 - [x] 3.4 GREEN: escribir `sql/02_exportar_snapshot.sql` con `\copy (SELECT * FROM v_snapshot_movil ORDER BY id) TO 'movil/servidor_snapshot.csv' CSV HEADER`; agregar al test que el CSV tiene `filas_copia + 1` líneas y está en UTF-8. Ejecutar la exportación (S0) y el test → OK; anotar la `copiado_en` de S0 en `evidencias/snapshot_s0.txt`.
-  - Pendiente: ejecutar humano (script escrito en `sql/02_exportar_snapshot.sql`; el test ya incluye las aserciones del CSV).
+  - Hecho: `scripts/correr_casos.sh` (paso 1) exporta S0 y anota su `copiado_en` en `evidencias/snapshot_s0.txt`; `test_vista_snapshot: OK`.
 - [x] 3.5 TRIANGULATE: re-ejecutar `01_v_snapshot_movil.sql` (idempotente) y comparar de nuevo el esquema del servidor → solo cambió la vista. Ejecutar el test → OK.
-  - Pendiente: ejecutar humano.
+  - Hecho: cada corrida de `scripts/correr_casos.sh` vuelve a ejecutar `01_v_snapshot_movil.sql`; `test_vista_snapshot: OK` compara el esquema contra `evidencias/esquema_servidor_antes.txt`.
 - Commit sugerido: `feat(tp8): vista v_snapshot_movil e instantánea CSV`
 
 ## 4. Consigna 2.a – Importación en SQLite y recarga del caché
@@ -45,7 +45,7 @@
 - [x] 4.3 RED: escribir `tests/test_carga_cache.sh`: carga inicial de N filas igual a `snapshot_servidor`; segunda instantánea con un precio cambiado → actualiza; con un producto `eliminado = 1` → la fila sigue, con `eliminado = 1`, y un `item_borrador` que la referencia sigue válido (`PRAGMA foreign_key_check` vacío); con un producto ausente → `eliminado = 1, disponible = 0`, fila no borrada; `copiado_en` de las filas = la de la instantánea. Ejecutar → falla por aserción (sin recarga el caché queda vacío).
 - [x] 4.4 GREEN: agregar a `movil/importar_snapshot.sql` el upsert (`WHERE true` + `ON CONFLICT (id) DO UPDATE`) y la marca de ausentes según design.md Decisión 6. Ejecutar ambos tests → OK.
 - [x] 4.5 Integración real: crear `movil/foodstore_movil.db` con `schema_sqlite.sql`, importar S0 y verificar que `producto_cache` tiene 50 005 filas (2 con `eliminado = 1`); guardar la salida en `evidencias/importacion_s0.txt`.
-  - Pendiente: necesita el CSV real (`movil/servidor_snapshot.csv`, 3.4 humano).
+  - Hecho: `evidencias/importacion_s0.txt` muestra `producto_cache=50005 eliminados=2`; lo exige `test_casos.sh`.
 - [x] 4.6 Agregar entrada a la bitácora sobre la decisión de crear `snapshot_servidor` STRICT antes del `.import` (qué pasaba si la creaba `.import`: todo TEXT y comparaciones INTEGER vs TEXT), con la prueba que lo demostró.
 - Commit sugerido: `feat(tp8): importación tipada de la instantánea y recarga del caché`
 
@@ -55,7 +55,7 @@
 - [x] 5.2 GREEN: escribir `movil/pruebas_sqlite.sql` en secciones comentadas: (1) borrador completo con `BEGIN ... COMMIT` (producto D, alias `vendedor_feria_1`, documentado como el borrador de C5); (2) otra operación deshecha con `ROLLBACK` mostrando conteos antes/después; (3) C1, la consulta del catálogo disponible; (4) C7 con `.bail off`: ítem con cantidad 0 dentro de un borrador en curso + `ROLLBACK`, y producto inexistente, mostrando conteos antes/después. Ejecutar el test → `test_pruebas_sqlite: OK`.
 - [x] 5.3 TRIANGULATE: agregar al test que re-ejecutar `pruebas_sqlite.sql` falla por PK del borrador de C5 sin dejar filas extra (no duplica). Ejecutar → OK.
 - [x] 5.4 Ejecutar `pruebas_sqlite.sql` sobre `movil/foodstore_movil.db` y guardar la salida en `evidencias/c1_c7_pruebas_sqlite.txt` (con `.echo on` y `.headers on`); verificar que muestra los errores de C7 y los conteos sin cambios.
-  - Pendiente: requiere `movil/foodstore_movil.db` con S0 real (3.4 y 4.5).
+  - Hecho: `scripts/correr_casos.sh` (paso 3) guarda `evidencias/c1_c7_pruebas_sqlite.txt`.
 - Commit sugerido: `feat(tp8): pruebas SQLite de transacciones, C1 y C7`
 
 ## 6. Consigna 2.b – Semáforo
@@ -75,7 +75,7 @@
 - [x] 7.3 Escribir los scripts del lado PostgreSQL en `sql/casos/`: `preparar_c2.sql` (sube el precio de A solo si tiene el original; aserción de 1 fila), `preparar_c4.sql` (`activo = false` de C solo si estaba activo; aserción de 1 fila), `restaurar_casos.sql` (valores originales literales, idempotente) y `sql/verificacion_final.sql` (pedidos, `sum(stock)` y huella, igual formato que `linea_base.sql`). Todos con la guarda de `food_store_copia`.
 - [x] 7.4 CHECKPOINT: mostrar al humano los productos elegidos (1.4), el cambio de precio de C2 y la baja de C4 que se harán en `food_store_copia`, y el plan de restauración; esperar confirmación.
 - [x] 7.5 Escribir `scripts/correr_casos.sh` con la secuencia de design.md Decisión 8 (C5 → C6 → C2 → aceptación C2 → C3 → C4 → restaurar → verificación), que exporta/importa una instantánea nueva antes de cada semáforo, guarda cada paso en `evidencias/c<N>_*.txt` (comando + salida) y ejecuta `restaurar_casos.sql` desde un `trap` si algo falla. **[PG-escritura]** ejecutarlo (o, si el agente no puede escribir en PG, el humano lo ejecuta y el agente revisa las evidencias). Ejecutar `tests/test_casos.sh` → `test_casos: OK`.
-  - Nota: script `scripts/correr_casos.sh` escrito; pendiente ejecución con acceso de escritura a PG.
+  - Hecho: ejecutado sobre `food_store_copia`; evidencias `evidencias/c2_*.txt` a `c6_*.txt` y `evidencias/verificacion_final_diff.txt` (PostgreSQL igual a la línea base); `test_casos: OK`.
 - [x] 7.6 TRIANGULATE: verificar por MCP que A y C volvieron a sus valores originales y que la huella coincide; ejecutar otra vez la verificación final y el semáforo sobre la base final → `changes() = 0`.
 - [x] 7.7 Documentar en `informe/informe.html`, sección 2.c, para cada caso: el comando, el resultado (extracto de la evidencia) y una o dos oraciones que lo expliquen; la consulta final de PostgreSQL con su salida frente a la línea base; en C6, la oración sobre la protección real en el servidor (clave de idempotencia `UNIQUE` sobre `solicitud_uuid` en la misma transacción que crea el pedido, parada 8); y que `SIMULADO_APROBADO` no es una venta. Anotar la fecha de copia de cada instantánea usada. Verificar que cada caso tiene sus tres partes.
 - Commit sugerido: `feat(tp8): casos C2 a C6 con evidencias y PostgreSQL sin cambios`
@@ -116,6 +116,8 @@
 
 - [x] 12.1 Reconstrucción desde cero: borrar `movil/foodstore_movil.db`, seguir el README de punta a punta (incluida la parte [PG-escritura]) y ejecutar todos los `tests/test_*.sh` → todos `OK`; la verificación final de PostgreSQL coincide con la línea base. Registrar la tabla de resultados en `evidencias/reconstruccion_desde_cero.txt`.
 - [x] 12.2 Verificar por MCP que `food_store_copia` está en la línea base (pedidos, `sum(stock)`, huella) y que la única diferencia de esquema es `v_snapshot_movil`; verificar que no hay datos personales reales en el `.db` (`SELECT DISTINCT usuario FROM pedido_borrador` solo devuelve alias inventados).
-- [ ] 12.3 CHECKPOINT (orquestador): consultar al `advisor` (FINAL_DIFF) sobre `git diff` antes de declarar cerrado el apply; resolver o exponer sus observaciones.
+- [x] 12.3 CHECKPOINT (orquestador): consultar al `advisor` (FINAL_DIFF) sobre `git diff` antes de declarar cerrado el apply; resolver o exponer sus observaciones.
+  - Hecho: primero BLOCK (P1–P6 del handoff), después CONCERNS; ambos resueltos en los commits `906d785` a `e081249`.
 - [x] 12.4 Ejecutar `openspec validate tp8-tablet-sqlite-sync --strict` → sin errores.
-- [ ] 12.5 Con confirmación explícita del usuario, el orquestador crea la etiqueta `tp8` sobre el commit final en el repo del TP7 (`nicolasmonjelardi/BaseDeDatos2-TP7-NoSQL`), donde vive `TP8/` (y el `push` si el usuario lo pide: requiere permiso de escritura en ese repo); verificar con `git tag --list tp8`.
+- [x] 12.5 Con confirmación explícita del usuario, el orquestador crea la etiqueta `tp8` sobre el commit final en el repo del TP7 (`nicolasmonjelardi/BaseDeDatos2-TP7-NoSQL`), donde vive `TP8/` (y el `push` si el usuario lo pide: requiere permiso de escritura en ese repo); verificar con `git tag --list tp8`.
+  - Hecho: etiqueta anotada `tp8` en `bcb7984`, rama y etiqueta subidas a `origin`.

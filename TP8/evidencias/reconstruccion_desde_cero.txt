@@ -1,0 +1,20 @@
+# Reconstruccion desde cero (tarea 12.1)
+# Ultima corrida completa de scripts/correr_casos.sh: 2026-11-01 20:51 (-03:00, S0 copiada 23:51:17Z),
+# commit 205c63e. Borra movil/foodstore_movil.db, la rehace desde schema_sqlite.sql y corre C1 a C7.
+# Resultado de la verificacion final (evidencias/verificacion_final_diff.txt):
+verificacion_final: PostgreSQL igual a la linea base (pedidos, stock y huella)
+
+# Tests ejecutados sobre ese resultado (bash tests/test_*.sh, 2026-11-01):
+test                    | resultado
+test_carga_cache.sh     | test_carga_cache: OK
+test_casos.sh           | test_casos: OK
+test_docs.sh            | test_docs: OK
+test_esquema_sqlite.sh  | test_esquema_sqlite: OK
+test_importacion.sh     | test_importacion: OK
+test_pruebas_sqlite.sh  | test_pruebas_sqlite: OK
+test_semaforo.sh        | test_semaforo: OK
+test_vista_snapshot.sh  | test_vista_snapshot: OK
+
+# importacion_s0.txt y snapshot_s0.txt se agregaron despues de esa corrida: se generaron con
+# los mismos comandos del paso 2 de correr_casos.sh sobre una base temporal y el CSV de S0
+# (movil/servidor_snapshot.csv), sin escribir en PostgreSQL.
