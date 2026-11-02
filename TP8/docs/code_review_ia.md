@@ -215,7 +215,7 @@ El subagente de Claude de solo lectura emitió el siguiente dictamen técnico:
 ### Hallazgo 2 (TP7): [CORR-02] Agrupación de toda la tabla en la vista comparativa
 * **Descripción de la IA:** En `consultas_postgresql.sql`, `CREATE TEMP VIEW pedido_total` agrupa todo `pedido_detalle` antes de emparejar con los 9 pedidos de la muestra de MongoDB.
 * **Decisión:** **ACEPTADO** (como recomendación; `consultas_postgresql.sql` es del TP7 y no se modificó).
-* **Comprobación en la base:** `EXPLAIN (ANALYZE, BUFFERS)` de la consulta d) en `food_store_copia`, con `scripts/medir_corr02.sql`. Salida completa en [`evidencias/code_review_2_explain.txt`](../evidencias/code_review_2_explain.txt) y resumen en [`evidencias/code_review_2.txt`](../evidencias/code_review_2.txt). Se usó la copia porque, por regla del change (`openspec/changes/tp8-tablet-sqlite-sync/tasks.md`), el TP8 solo usa esa base para no tocar la original, y la `foodstore` del TP7 no existe en esta máquina; la consulta se midió sin `pedido.estado`, que la copia no tiene y la vista no usa.
+* **Comprobación en la base:** `EXPLAIN (ANALYZE, BUFFERS)` de la consulta d) en `food_store_copia`, con `scripts/medir_corr02.sql`. Salida completa en [`evidencias/code_review_2_explain.txt`](../evidencias/code_review_2_explain.txt) y resumen en [`evidencias/code_review_2.txt`](../evidencias/code_review_2.txt). Se usó la copia porque, por regla del change (`openspec/changes/archive/2026-11-01-tp8-tablet-sqlite-sync/tasks.md`), el TP8 solo usa esa base para no tocar la original, y la `foodstore` del TP7 no existe en esta máquina; la consulta se midió sin `pedido.estado`, que la copia no tiene y la vista no usa.
 
   | | Vista original | Con filtro temprano |
   |---|---|---|

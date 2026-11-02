@@ -18,7 +18,7 @@ El TP vive en la carpeta `TP8/` del repositorio del TP7, rama `tp8`, etiqueta `t
 | 2.c | Casos C2 a C6 y verificación en PostgreSQL | [`scripts/correr_casos.sh`](scripts/correr_casos.sh), [`movil/casos/`](movil/casos/), [`sql/casos/`](sql/casos/), [`sql/linea_base.sql`](sql/linea_base.sql), [`sql/verificacion_final.sql`](sql/verificacion_final.sql) |
 | 3.a, 3.b | Mapa de los tres motores y plan de mantenimiento | [`docs/informe.pdf`](docs/informe.pdf), [`docs/plan_mantenimiento_tp8.md`](docs/plan_mantenimiento_tp8.md) |
 | 3.c | Code review con IA | [`docs/code_review_ia.md`](docs/code_review_ia.md) |
-| 4.a | Spec (EARS), diseño y tareas | [`docs/kiro/`](docs/kiro/) (derivados de [`openspec/changes/tp8-tablet-sqlite-sync/`](openspec/changes/tp8-tablet-sqlite-sync/)) |
+| 4.a | Spec (EARS), diseño y tareas | [`docs/kiro/`](docs/kiro/) (derivados de [`openspec/changes/archive/2026-11-01-tp8-tablet-sqlite-sync/`](openspec/changes/archive/2026-11-01-tp8-tablet-sqlite-sync/)) |
 | 4.b | Bitácora de IA y DUIA | [`docs/bitacora_ia.md`](docs/bitacora_ia.md), [`docs/DUIA.md`](docs/DUIA.md) |
 
 La base de la tablet ya armada es [`movil/foodstore_movil.db`](movil/foodstore_movil.db). Las salidas de cada paso están en [`evidencias/`](evidencias/).

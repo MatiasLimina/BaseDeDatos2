@@ -1,6 +1,6 @@
 # Diseño: tablet con SQLite y sincronización simulada (TP8)
 
-> Nota: estos documentos se derivan de OpenSpec (`openspec/changes/tp8-tablet-sqlite-sync/`) porque el equipo no usó Kiro. Mantienen el formato de tres archivos de Kiro. Las decisiones salen del `design.md` de ese change.
+> Nota: estos documentos se derivan de OpenSpec (`openspec/changes/archive/2026-11-01-tp8-tablet-sqlite-sync/`) porque el equipo no usó Kiro. Mantienen el formato de tres archivos de Kiro. Las decisiones salen del `design.md` de ese change.
 
 ## Flujo
 
