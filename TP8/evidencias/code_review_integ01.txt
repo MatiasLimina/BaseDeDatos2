@@ -1,0 +1,36 @@
+=== Comprobacion Empirica Hallazgo INTEG-01 (PRAGMA foreign_keys por conexion) ===
+Fecha: 2026-11-01T23:27:04Z
+SQLite: 3.51.0
+Base: temporal, creada con movil/schema_sqlite.sql (producto_cache vacia).
+Insercion: item_borrador con producto_id = 999999, que no existe en producto_cache.
+
+--- Conexion 1: SIN el PRAGMA ---
+foreign_keys = 0
+changes() = 1
+
+--- Conexion 2: CON el PRAGMA (se borra la fila anterior y se repite la insercion) ---
+foreign_keys = 1
+Error: stepping, FOREIGN KEY constraint failed (19)
+
+--- Estado final ---
+filas en item_borrador = 0
+
+--- Huerfano que dejaria la conexion 1 (PRAGMA foreign_key_check) ---
+item_borrador|1|producto_cache|0
+
+--- Mitigacion: primera sentencia SQL de cada script de la tablet ---
+(se saltean comentarios y comandos del shell sqlite3 como .headers, que no son SQL)
+movil/importar_snapshot.sql: PRAGMA foreign_keys = ON;
+movil/pruebas_sqlite.sql: PRAGMA foreign_keys = ON;
+movil/schema_sqlite.sql: PRAGMA foreign_keys = ON;
+movil/semaforo.sql: PRAGMA foreign_keys = ON;
+movil/casos/c2_aceptar.sql: PRAGMA foreign_keys = ON;
+movil/casos/c2_borrador.sql: PRAGMA foreign_keys = ON;
+movil/casos/c3_borrador.sql: PRAGMA foreign_keys = ON;
+movil/casos/c4_borrador.sql: PRAGMA foreign_keys = ON;
+movil/casos/c5_c6.sql: PRAGMA foreign_keys = ON;
+
+Decision: ACEPTADO. Sin el PRAGMA, SQLite guarda un item de un producto inexistente
+sin avisar (changes() = 1) y solo PRAGMA foreign_key_check lo detecta despues.
+Ya esta mitigado: todos los scripts de movil/ lo activan en su primera sentencia.
+Cualquier cliente nuevo que abra la .db tiene que hacer lo mismo.
