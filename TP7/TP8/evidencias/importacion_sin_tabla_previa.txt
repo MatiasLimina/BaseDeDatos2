@@ -1,0 +1,13 @@
+Prueba: que pasa si .import crea la tabla (sqlite3 3.51.0, fixture tests/fixtures/snapshot_valido.csv)
+Comandos: sqlite3 x.db ".import --csv s.csv snap_sin_tipos" + consultas sobre snap_sin_tipos y una tabla STRICT item(cantidad INTEGER, precio INTEGER)
+
+Columnas creadas por .import: id|TEXT, nombre|TEXT, precio_centavos|TEXT, stock|TEXT, disponible|TEXT, eliminado|TEXT, copiado_en|TEXT, filas_copia|TEXT
+typeof(stock) = text
+
+Comparacion columna contra columna (cantidad 5 y 1000 contra stock 48): 5>48=0, 1000>48=1 -> correcta (SQLite aplica afinidad numerica al operando TEXT).
+Comparacion con una expresion (cantidad+0 > stock): 5>48=1 (INCORRECTO, compara '5' > '48' como texto), 1000>48=0 (INCORRECTO).
+max(stock) = 7 (el mayor como texto, no 48). ORDER BY stock = 0,15,29,48,7 (orden de texto).
+sum(stock) = 99 (SUM convierte, da bien).
+
+Conclusion: con la tabla creada por .import el resultado depende de como se escriba la consulta (columna vs expresion, max, ORDER BY): una trampa silenciosa.
+Con snapshot_servidor STRICT creada antes, los valores son INTEGER siempre, y .import rechaza 't'/'f' (ver tests/test_importacion.sh).

@@ -1,0 +1,16 @@
+=== Comprobacion Empirica Hallazgo CORR-01 (Semáforo de stock) ===
+Fecha: "2026-11-01T18:33:36Z"
+Contexto: Evaluacion de dos solicitudes encoladas de 2 unidades c/u frente a stock = 3.
+
+Resultado en SQLite:
+20000000-0000-4000-8000-000000000001|10000000-0000-4000-8000-000000000001|SIMULADO_APROBADO|
+20000000-0000-4000-8000-000000000002|10000000-0000-4000-8000-000000000002|SIMULADO_APROBADO|
+
+Fundamento del descarte:
+1. En la tablet cada borrador se evalua de forma aislada porque SIMULADO_APROBADO
+   no es una venta confirmada ni reserva stock en el servidor.
+2. Controlar el stock entre varias ventas le corresponde al servidor cuando la venta se
+   confirme, y eso queda fuera del TP8 (la tablet nunca escribe en PostgreSQL). Descontar
+   stock en una tablet desconectada daria inventarios distintos en cada tablet y una
+   reserva que no existe.
+Decision: DESCARTADO con fundamento comprobable.
