@@ -1,0 +1,24 @@
+     tabla      |    tipo     |      restriccion      |        columnas        | referencia 
+----------------+-------------+-----------------------+------------------------+------------
+ categoria      | UNIQUE      | categoria_nombre_key  | nombre                 | 
+ categoria      | PRIMARY KEY | categoria_pkey        | id                     | 
+ cliente        | UNIQUE      | unq_cliente_email     | email                  | 
+ cliente        | PRIMARY KEY | cliente_pkey          | id                     | 
+ pedido         | PRIMARY KEY | pedido_pkey           | id                     | 
+ pedido         | FOREIGN KEY | fk_pedido_cliente     | cliente_id             | cliente
+ pedido_detalle | PRIMARY KEY | pk_pedido_detalle     | pedido_id, producto_id | 
+ pedido_detalle | FOREIGN KEY | fk_detalle_pedido     | pedido_id              | pedido
+ pedido_detalle | FOREIGN KEY | fk_detalle_producto   | producto_id            | producto
+ producto       | PRIMARY KEY | producto_pkey         | id                     | 
+ producto       | FOREIGN KEY | fk_producto_categoria | categoria_id           | categoria
+(11 filas)
+
+     tabla      |           restriccion           |            definicion             
+----------------+---------------------------------+-----------------------------------
+ producto       | chk_producto_precio_no_negativo | CHECK ((precio >= 0.00))
+ producto       | chk_producto_stock_no_negativo  | CHECK ((stock >= 0))
+ pedido_detalle | chk_detalle_cantidad_positiva   | CHECK ((cantidad > 0))
+ pedido_detalle | chk_detalle_precio_positivo     | CHECK ((precio_unitario >= 0.00))
+ pedido_detalle | chk_detalle_subtotal_positivo   | CHECK ((subtotal >= 0.00))
+(5 filas)
+

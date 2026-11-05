@@ -1,0 +1,4 @@
+$ bash tests/test_consultas.sh
+test_consultas: OK
+$ bash tests/test_migracion.sh
+test_migracion: OK
