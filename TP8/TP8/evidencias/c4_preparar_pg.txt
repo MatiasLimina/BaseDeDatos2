@@ -1,2 +1,0 @@
-psql:D:/A_Universidad/Tercer semestre/Base de Datos 2/BasesNoRelacionales/TP8/sql/casos/preparar_c4.sql:28: NOTICE:  preparar_c4: OK (producto 3 dado de baja logica)
-DO

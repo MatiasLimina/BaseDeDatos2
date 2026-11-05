@@ -1,51 +1,98 @@
-# BaseDeDatos2-TP7-NoSQL
+# TP8 — Food Store en la feria: la base de la tablet y el cierre de la capa de datos
 
-TP Unidad 7 — NoSQL y nuevas formas de almacenamiento: Food Store en MongoDB frente a PostgreSQL. Bases de Datos II.
+**Integrantes:** Matias Limina, Nicolas Monjelardi y Lautaro Aguero.
 
-Integrantes: Matias Limina - Nicolas Monjelardi - Lautaro Aguero
+TP Unidad 8 de Bases de Datos II. El food truck vende en una feria sin señal. La tablet tiene una base SQLite donde solo consulta el catálogo y arma borradores; la sincronización con PostgreSQL se **simula** con un semáforo. **El móvil propone, el servidor dispone**: precio, stock y ventas los decide PostgreSQL, y `SIMULADO_APROBADO` no es una venta.
 
-La base relacional es la `foodstore` del proyecto integrador. Ver el repositorio [MatiasLimina/BaseDeDatos2](https://github.com/MatiasLimina/BaseDeDatos2) y su `TP6/README.md` para cargarla. Todo el TP se hizo con Claude Code.
+El TP vive en la carpeta `TP8/` del repositorio del TP7, rama `tp8`, etiqueta `tp8`.
 
 ## Contenido
 
-| Parte | Qué | Archivos |
+| Consigna | Qué | Archivos |
 |---|---|---|
-| Previo | Estado del pedido agregado a `foodstore` (la consigna lo pide y el modelo no lo tenía) | [`sql/00_estado_pedido.sql`](sql/00_estado_pedido.sql), [`sql/test_estado_pedido.sql`](sql/test_estado_pedido.sql) |
-| 1 | Modelo documental, migración y reglas de integridad | [`docs/modelo_documental.md`](docs/modelo_documental.md), [`sql/01_seleccion_pedidos.sql`](sql/01_seleccion_pedidos.sql), [`migracion/generar_insert_pedidos.sql`](migracion/generar_insert_pedidos.sql), [`mongodb/01_crear_coleccion.js`](mongodb/01_crear_coleccion.js), [`mongodb/02_insert_pedidos.js`](mongodb/02_insert_pedidos.js), [`tests/test_migracion.sh`](tests/test_migracion.sh) |
-| 2 | Consultas en los dos motores y tabla de verificación | [`consultas_mongodb.js`](consultas_mongodb.js), [`consultas_postgresql.sql`](consultas_postgresql.sql), [`docs/consultas_verificacion.md`](docs/consultas_verificacion.md), [`tests/test_consultas.sh`](tests/test_consultas.sh) |
-| 3 | Consulta a una IA aislada, contraste de dos afirmaciones y conclusión | [`docs/ia/consulta_ia.md`](docs/ia/consulta_ia.md), [`docs/contraste_ia.md`](docs/contraste_ia.md), [`evidencias/parte3_contraste_mongodb.txt`](evidencias/parte3_contraste_mongodb.txt), [`evidencias/parte3_lectura_pedido_completo.txt`](evidencias/parte3_lectura_pedido_completo.txt) |
+| 1.a | Qué datos viajan a la tablet | [`docs/informe.pdf`](docs/informe.pdf) (sección 1.a) |
+| 1.b | Esquema SQLite: 4 tablas `STRICT` + `snapshot_servidor` | [`movil/schema_sqlite.sql`](movil/schema_sqlite.sql) |
+| 1.c | Borrador con `COMMIT`, `ROLLBACK`, casos C1 y C7 | [`movil/pruebas_sqlite.sql`](movil/pruebas_sqlite.sql) |
+| 2.a | Vista `v_snapshot_movil`, CSV e importación | [`sql/01_v_snapshot_movil.sql`](sql/01_v_snapshot_movil.sql), [`sql/02_exportar_snapshot.sql`](sql/02_exportar_snapshot.sql), [`movil/servidor_snapshot.csv`](movil/servidor_snapshot.csv), [`movil/importar_snapshot.sql`](movil/importar_snapshot.sql) |
+| 2.b | Semáforo | [`movil/semaforo.sql`](movil/semaforo.sql) |
+| 2.c | Casos C2 a C6 y verificación en PostgreSQL | [`scripts/correr_casos.sh`](scripts/correr_casos.sh), [`movil/casos/`](movil/casos/), [`sql/casos/`](sql/casos/), [`sql/linea_base.sql`](sql/linea_base.sql), [`sql/verificacion_final.sql`](sql/verificacion_final.sql) |
+| 3.a, 3.b | Mapa de los tres motores y plan de mantenimiento | [`docs/informe.pdf`](docs/informe.pdf), [`docs/plan_mantenimiento_tp8.md`](docs/plan_mantenimiento_tp8.md) |
+| 3.c | Code review con IA | [`docs/code_review_ia.md`](docs/code_review_ia.md) |
+| 4.a | Spec (EARS), diseño y tareas | [`docs/kiro/`](docs/kiro/) (derivados de [`openspec/changes/archive/2026-11-01-tp8-tablet-sqlite-sync/`](openspec/changes/archive/2026-11-01-tp8-tablet-sqlite-sync/)) |
+| 4.b | Bitácora de IA y DUIA | [`docs/bitacora_ia.md`](docs/bitacora_ia.md), [`docs/DUIA.md`](docs/DUIA.md) |
 
-Evidencias en [`evidencias/`](evidencias/).
+La base de la tablet ya armada es [`movil/foodstore_movil.db`](movil/foodstore_movil.db). Las salidas de cada paso están en [`evidencias/`](evidencias/).
 
-**Entrega:**
-- [`informe_tp7.pdf`](informe_tp7.pdf): 4 páginas (la consigna permite 5), generado desde [`informe/informe_tp7.html`](informe/informe_tp7.html).
-- Archivos adjuntos: [`consultas_mongodb.js`](consultas_mongodb.js) y [`consultas_postgresql.sql`](consultas_postgresql.sql).
+Al terminar `scripts/correr_casos.sh`, los dos archivos de `movil/` quedan en momentos distintos, a propósito:
 
-## Orden de ejecución
+- `servidor_snapshot.csv` es S0 exportada de nuevo con el servidor ya restaurado: coincide con `food_store_copia`.
+- `foodstore_movil.db` es la tablet después del último caso: `cola_sync` tiene los resultados de C2 a C6, y `snapshot_servidor` y `producto_cache` son los de C4 (producto 1 a 299000 y producto 3 como lápida, `eliminado = 1`). No se reimporta S0 para no borrar esa lápida.
 
-Requiere:
-- PostgreSQL 16 o superior con `foodstore` cargada, y `pgpass.conf` para el usuario `postgres`;
-- MongoDB en `localhost:27017` y `mongosh`;
-- Git Bash para el test.
+**Desvío de herramientas.** La consigna pide Kiro y OpenCode. Se usaron Claude Code y OpenSpec: la spec se escribió y commiteó antes que el código, y `docs/kiro/` se derivó de ella. Ver [`docs/DUIA.md`](docs/DUIA.md).
 
-Se ejecuta desde la raíz del repo:
+## Requisitos
+
+- PostgreSQL 16 o superior, con la base de pruebas **`food_store_copia`** (una copia de `foodstore`, con datos inventados). Nunca se usa la base real.
+- `pgpass.conf` con una línea para esa base (`localhost:5432:food_store_copia:postgres:<clave>`): los scripts usan `psql -w` y no piden contraseña.
+- `sqlite3` 3.37 o superior (para `STRICT`).
+- Git Bash.
+- Para el PDF: Google Chrome o Microsoft Edge, y Python con `pypdf`.
+
+## Orden para crear todo desde cero
+
+Todo se ejecuta **desde `TP8/`**:
 
 ```bash
-# Previo: estado del pedido (idempotente)
-psql -X -w -h localhost -U postgres -d foodstore -v ON_ERROR_STOP=1 -f sql/00_estado_pedido.sql
-psql -X -w -h localhost -U postgres -d foodstore -v ON_ERROR_STOP=1 -f sql/test_estado_pedido.sql   # -> test_estado_pedido: OK
-
-# Parte 1: generar el insertMany desde PostgreSQL, crear la colección y migrar
-psql -X -w -h localhost -U postgres -d foodstore -At -v ON_ERROR_STOP=1 -f migracion/generar_insert_pedidos.sql -o mongodb/02_insert_pedidos.js
-mongosh mongodb://localhost:27017/foodstore --file mongodb/01_crear_coleccion.js
-mongosh mongodb://localhost:27017/foodstore --file mongodb/02_insert_pedidos.js       # -> pedidos insertados: 9
-bash tests/test_migracion.sh                                                          # -> test_migracion: OK
-
-# Parte 2: consultas en ambos motores y comparación automática de los ids
-mongosh mongodb://localhost:27017/foodstore --file consultas_mongodb.js
-psql -X -w -h localhost -U postgres -d foodstore -v ON_ERROR_STOP=1 -f consultas_postgresql.sql
-bash tests/test_consultas.sh                                                          # -> test_consultas: OK
-
-# Informe: regenerar el PDF y verificar que no supere las 5 páginas
-bash informe/generar_pdf.sh
+export PATH="$PATH:/d/DevTools/PosgresSQL/bin:/d/DevTools/miniconda3/Library/bin"   # ajustar a tu instalación
+export PGCLIENTENCODING=UTF8
+P="psql -X -w -h localhost -U postgres -d food_store_copia -v ON_ERROR_STOP=1"
 ```
+
+**1. Línea base del servidor (solo lectura).** Se toma una vez, **antes** de tocar nada: es la referencia contra la que se comprueba al final que PostgreSQL no cambió.
+
+```bash
+$P -At -f sql/linea_base.sql > evidencias/linea_base.txt
+```
+
+**2. Tests que no necesitan el servidor** (usan CSV de prueba en `tests/fixtures/`):
+
+```bash
+bash tests/test_esquema_sqlite.sh     # -> test_esquema_sqlite: OK
+bash tests/test_importacion.sh        # -> test_importacion: OK
+bash tests/test_carga_cache.sh        # -> test_carga_cache: OK
+bash tests/test_pruebas_sqlite.sh     # -> test_pruebas_sqlite: OK
+bash tests/test_semaforo.sh           # -> test_semaforo: OK
+```
+
+**3. Vista e instantánea en PostgreSQL** (consigna 2.a). La vista es lo único que se crea en el servidor:
+
+```bash
+$P -f sql/01_v_snapshot_movil.sql
+$P -f sql/02_exportar_snapshot.sql    # -> COPY 50005, en movil/servidor_snapshot.csv
+bash tests/test_vista_snapshot.sh     # -> test_vista_snapshot: OK
+```
+
+**4. Base de la tablet** (consignas 1.b, 1.c y 2.a):
+
+```bash
+rm -f movil/foodstore_movil.db
+sqlite3 movil/foodstore_movil.db < movil/schema_sqlite.sql
+sqlite3 movil/foodstore_movil.db < movil/importar_snapshot.sql
+sqlite3 movil/foodstore_movil.db < movil/pruebas_sqlite.sql   # C1 y C7 muestran errores a propósito
+```
+
+**5. Casos C1 a C7** (consigna 2.c). El script rehace los pasos 3 y 4 y corre C5, C6, C2, C3 y C4. Para C2 y C4 cambia la copia del servidor (sube un precio, da de baja un producto) y la **restaura** al final, también si falla o se corta con Ctrl+C. Termina comparando contra la línea base y falla si PostgreSQL quedó distinto:
+
+```bash
+bash scripts/correr_casos.sh   # -> verificacion_final: PostgreSQL igual a la linea base
+bash tests/test_casos.sh       # -> test_casos: OK
+```
+
+**6. Informe:**
+
+```bash
+bash informe/generar_pdf.sh    # -> docs/informe.pdf, falla si supera 6 páginas
+bash tests/test_docs.sh        # -> test_docs: OK
+```
+
+Para generar un UUID en SQLite (por ejemplo, para una solicitud nueva): `SELECT lower(hex(randomblob(4)) || '-' || hex(randomblob(2)) || '-4' || substr(hex(randomblob(2)), 2) || '-' || substr('89ab', 1 + (abs(random()) % 4), 1) || substr(hex(randomblob(2)), 2) || '-' || hex(randomblob(6)));`

@@ -1,6 +1,0 @@
-id,nombre,precio_centavos,stock,disponible,eliminado,copiado_en,filas_copia
-1,Coca Cola 1.5L,299900,48,1,0,2026-11-02T09:00:00Z,5
-2,"Pan, lactal",120050,0,0,0,2026-11-02T09:00:00Z,5
-3,Papas Fritas 150g,180000,29,1,0,2026-11-02T09:00:00Z,5
-4,Queso Tybo x 200g,320000,15,1,0,2026-11-02T09:00:00Z,5
-5,Producto dado de baja,50000,7,0,1,2026-11-02T09:00:00Z,5

@@ -1,5 +1,0 @@
-categoria: id:bigint, nombre:character varying, activo:boolean, created_at:timestamp with time zone
-cliente: id:bigint, nombre:character varying, apellido:character varying, email:character varying, telefono:character varying, activo:boolean, created_at:timestamp with time zone
-pedido: id:bigint, fecha:timestamp with time zone, forma_pago:USER-DEFINED, cliente_id:bigint, created_at:timestamp with time zone
-pedido_detalle: pedido_id:bigint, producto_id:bigint, cantidad:integer, precio_unitario:numeric, subtotal:numeric
-producto: id:bigint, nombre:character varying, precio:numeric, stock:integer, activo:boolean, categoria_id:bigint, created_at:timestamp with time zone

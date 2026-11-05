@@ -1,2 +1,0 @@
-psql:D:/A_Universidad/Tercer semestre/Base de Datos 2/BasesNoRelacionales/TP8/sql/casos/restaurar_casos.sql:27: NOTICE:  restaurar_casos: OK (productos 1 y 3 restaurados a sus valores originales)
-DO
