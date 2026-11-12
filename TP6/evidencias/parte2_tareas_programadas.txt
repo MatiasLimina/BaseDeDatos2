@@ -1,4 +1,4 @@
-﻿Tareas programadas de Food Store - registradas el 2026-11-12T09:26:56 en DESKTOP-44EL3I6
+﻿Tareas programadas de Food Store - registradas el 2026-11-12T09:36:48 en DESKTOP-44EL3I6
 Base de origen: food_store_copia
 UltimoResultado: 0 = exito; 267011 = nunca se ejecuto.
 
@@ -11,7 +11,7 @@ Ejecuta          : powershell.exe -NoProfile -NonInteractive -ExecutionPolicy By
                    semestre\Base de Datos 2\BaseDeDatos2\TP6\backup_foodstore.ps1" -Database food_store_copia
 Usuario          : matia (Interactive)
 ProximaEjecucion : 13/11/2026 02:00:00
-UltimaEjecucion  : 12/11/2026 09:26:29
+UltimaEjecucion  : 12/11/2026 09:36:21
 UltimoResultado  : 0
 
 Tarea            : \FoodStore\FoodStore-ChequeoSalud
@@ -23,7 +23,7 @@ Ejecuta          : powershell.exe -NoProfile -NonInteractive -ExecutionPolicy By
                    health -Database food_store_copia
 Usuario          : matia (Interactive)
 ProximaEjecucion : 13/11/2026 02:30:00
-UltimaEjecucion  : 12/11/2026 09:26:11
+UltimaEjecucion  : 12/11/2026 09:36:25
 UltimoResultado  : 0
 
 Tarea            : \FoodStore\FoodStore-Mantenimiento
@@ -35,7 +35,7 @@ Ejecuta          : powershell.exe -NoProfile -NonInteractive -ExecutionPolicy By
                    maintenance -Database food_store_copia
 Usuario          : matia (Interactive)
 ProximaEjecucion : 15/11/2026 03:00:00
-UltimaEjecucion  : 12/11/2026 09:26:36
+UltimaEjecucion  : 12/11/2026 09:36:28
 UltimoResultado  : 0
 
 Tarea            : \FoodStore\FoodStore-RestorePrueba
@@ -46,7 +46,19 @@ Ejecuta          : powershell.exe -NoProfile -NonInteractive -ExecutionPolicy By
                    semestre\Base de Datos 2\BaseDeDatos2\TP6\restore_test.ps1" -Origen food_store_copia
 Usuario          : matia (Interactive)
 ProximaEjecucion : 15/11/2026 03:30:00
-UltimaEjecucion  : 12/11/2026 09:26:39
+UltimaEjecucion  : 12/11/2026 09:36:32
+UltimoResultado  : 0
+
+Tarea            : \FoodStore\FoodStore-Integridad
+Estado           : Ready
+Disparador       : semanal 04:00
+LimiteEjecucion  : PT30M
+Ejecuta          : powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File "D:\A_Universidad\Tercer 
+                   semestre\Base de Datos 2\BaseDeDatos2\TP6\ejecutar_sql.ps1" -Script integrity_check.sql -Prefijo 
+                   integrity -Database food_store_copia
+Usuario          : matia (Interactive)
+ProximaEjecucion : 15/11/2026 04:00:00
+UltimaEjecucion  : 12/11/2026 09:36:42
 UltimoResultado  : 0
 
 

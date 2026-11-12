@@ -12,7 +12,8 @@ La consigna está en `TPUnidad_6_Mantenimiento_FoodStore.pdf` y el plan, en [`SP
 | 2 | Respaldo automatizable | [`backup_foodstore.ps1`](backup_foodstore.ps1) | [`evidencias/parte2_respaldo.md`](evidencias/parte2_respaldo.md) |
 | 3 | Chequeo de salud | [`health_check.sql`](health_check.sql) | [`evidencias/parte3_monitoreo_mantenimiento.md`](evidencias/parte3_monitoreo_mantenimiento.md) |
 | 3 | Revisión de mantenimiento y su test | [`maintenance.sql`](maintenance.sql), [`tests/test_maintenance.sh`](tests/test_maintenance.sh) | ídem |
-| 2-4 | Programación de las 4 tareas en el Programador de tareas de Windows | [`registrar_tareas.ps1`](registrar_tareas.ps1), [`ejecutar_sql.ps1`](ejecutar_sql.ps1) | [`evidencias/parte2_tareas_programadas.txt`](evidencias/parte2_tareas_programadas.txt), [`evidencias/parte2_tareas_programadas_logs.txt`](evidencias/parte2_tareas_programadas_logs.txt) |
+| 3 | Verificación de integridad (`amcheck`) y su test | [`integrity_check.sql`](integrity_check.sql), [`tests/test_integrity.sh`](tests/test_integrity.sh) | [`evidencias/parte3_integridad.txt`](evidencias/parte3_integridad.txt), [`evidencias/parte3_test_integridad.txt`](evidencias/parte3_test_integridad.txt) |
+| 2-4 | Programación de las 5 tareas en el Programador de tareas de Windows | [`registrar_tareas.ps1`](registrar_tareas.ps1), [`ejecutar_sql.ps1`](ejecutar_sql.ps1) | [`evidencias/parte2_tareas_programadas.txt`](evidencias/parte2_tareas_programadas.txt), [`evidencias/parte2_tareas_programadas_logs.txt`](evidencias/parte2_tareas_programadas_logs.txt) |
 | 4 | Restauración de prueba y su test (opcional en la consigna) | [`restore_test.ps1`](restore_test.ps1), [`tests/test_restore.sh`](tests/test_restore.sh) | [`evidencias/parte4_simulacro.md`](evidencias/parte4_simulacro.md) |
 | 5 | Informe post-incidente (una página) | [`informe_u6.pdf`](informe_u6.pdf), con su fuente en [`informe/`](informe/) | — |
 
@@ -38,6 +39,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File ./backup_foodstore.ps1
 psql -X -w -h localhost -U postgres -d foodstore -v ON_ERROR_STOP=1 -f health_check.sql -o logs/health_$(date +%Y%m%d).txt
 psql -X -w -h localhost -U postgres -d foodstore -v ON_ERROR_STOP=1 -f maintenance.sql -o logs/maintenance_$(date +%Y%m%d).txt
 bash tests/test_maintenance.sh      # -> test_maintenance: OK (usa la base descartable foodstore_maint_test)
+bash tests/test_integrity.sh        # -> test_integrity: OK (usa la base descartable foodstore_integ_test)
 
 # Parte 4: simulacro (solo sobre foodstore_restore_test)
 bash tests/test_restore.sh          # -> test_restore: OK (necesita un respaldo previo)

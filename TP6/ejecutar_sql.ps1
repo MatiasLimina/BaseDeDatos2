@@ -1,6 +1,6 @@
 <#
 .SYNOPSIS
-    Ejecuta health_check.sql o maintenance.sql desde una tarea programada (SPEC_U6.md).
+    Ejecuta health_check.sql, maintenance.sql o integrity_check.sql desde una tarea programada (SPEC_U6.md).
 
 .DESCRIPTION
     El Programador de tareas no puede armar por si solo un nombre de archivo con la fecha,
@@ -17,7 +17,7 @@
 #>
 [CmdletBinding()]
 param(
-    [Parameter(Mandatory)][ValidateSet('health_check.sql', 'maintenance.sql')]
+    [Parameter(Mandatory)][ValidateSet('health_check.sql', 'maintenance.sql', 'integrity_check.sql')]
     [string]$Script,
     [Parameter(Mandatory)][string]$Prefijo,
     [string]$DbHost   = 'localhost',

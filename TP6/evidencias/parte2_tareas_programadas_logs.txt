@@ -1,12 +1,13 @@
-Lineas de log de la primera corrida de las 4 tareas, lanzadas desde el Programador de tareas (Start-ScheduledTask) el 2026-11-12, base food_store_copia.
+Lineas de log de la corrida de las 5 tareas, lanzadas desde el Programador de tareas (Start-ScheduledTask) el 2026-11-12, base food_store_copia.
 Copiadas de logs/ (no versionado).
 
-== logs/tareas_programadas.log (ultimas)
-2026-11-12T09:26:12 OK    health_check.sql -> health_20261112_092611.txt (0,5 s)
-2026-11-12T09:26:36 OK    maintenance.sql -> maintenance_20261112_092636.txt (0,4 s)
+== logs/tareas_programadas.log
+2026-11-12T09:36:25 OK    health_check.sql -> health_20261112_093625.txt (0,2 s)
+2026-11-12T09:36:29 OK    maintenance.sql -> maintenance_20261112_093629.txt (0,2 s)
+2026-11-12T09:36:43 OK    integrity_check.sql -> integrity_20261112_093642.txt (0,9 s)
 
 == logs/backup_foodstore.log
-2026-11-12T09:26:32 OK food_store_copia_20261112_092629.dump 3,8 MB en 2,7 s; conteos en food_store_copia_20261112_092629.counts.csv
+2026-11-12T09:36:23 OK food_store_copia_20261112_093622.dump 3,8 MB en 1,2 s; conteos en food_store_copia_20261112_093622.counts.csv
 
 == logs/restore_test.log
-2026-11-12T09:26:52 OK food_store_copia_20261112_092629.dump restaurado en foodstore_restore_test; RPO 0d 00:00:11; RTO 11,2 s; 5/5 conteos, 0 invalidos; detalle en restore_test_20261112_092640.txt
+2026-11-12T09:36:40 OK food_store_copia_20261112_093622.dump restaurado en foodstore_restore_test; RPO 0d 00:00:10; RTO 5,9 s; 5/5 conteos, 0 invalidos; detalle en restore_test_20261112_093632.txt

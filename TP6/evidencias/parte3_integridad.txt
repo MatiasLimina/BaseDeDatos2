@@ -1,0 +1,34 @@
+Salida de integrity_check.sql lanzado desde la tarea FoodStore-Integridad el 2026-11-12, base food_store_copia (copiada de logs/integrity_20261112_093642.txt).
+
+       momento       |       base       
+---------------------+------------------
+ 2026-11-12 09:36:43 | food_store_copia
+
+== Integridad por objeto
+  tipo  |              objeto              |            tabla             | resultado 
+--------+----------------------------------+------------------------------+-----------
+ tabla  | categoria                        | -                            | OK
+ tabla  | cliente                          | -                            | OK
+ tabla  | mv_facturacion_categoria_mes     | -                            | OK
+ tabla  | pedido                           | -                            | OK
+ tabla  | pedido_detalle                   | -                            | OK
+ tabla  | producto                         | -                            | OK
+ indice | categoria_nombre_key             | categoria                    | OK
+ indice | categoria_pkey                   | categoria                    | OK
+ indice | cliente_pkey                     | cliente                      | OK
+ indice | idx_detalle_producto_id          | pedido_detalle               | OK
+ indice | idx_detalle_subtotal             | pedido_detalle               | OK
+ indice | idx_mv_facturacion_categoria_mes | mv_facturacion_categoria_mes | OK
+ indice | idx_pedido_cliente_id            | pedido                       | OK
+ indice | idx_pedido_fecha                 | pedido                       | OK
+ indice | idx_producto_categoria_activo    | producto                     | OK
+ indice | pedido_pkey                      | pedido                       | OK
+ indice | pk_pedido_detalle                | pedido_detalle               | OK
+ indice | producto_pkey                    | producto                     | OK
+ indice | unq_cliente_email                | cliente                      | OK
+
+== Resumen
+ ok | fallas | omitidas 
+----+--------+----------
+ 19 |      0 |        0
+

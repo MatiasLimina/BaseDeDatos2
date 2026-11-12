@@ -1,6 +1,6 @@
 <#
 .SYNOPSIS
-    Registra en el Programador de tareas de Windows las 4 tareas de SPEC_U6.md.
+    Registra en el Programador de tareas de Windows las 5 tareas de SPEC_U6.md.
 
 .DESCRIPTION
     Crea (o reemplaza) las tareas dentro de la carpeta \FoodStore\ del Programador:
@@ -10,6 +10,7 @@
       FoodStore-ChequeoSalud    health_check.sql       diaria 02:30 (despues del respaldo)
       FoodStore-Mantenimiento   maintenance.sql        domingo 03:00
       FoodStore-RestorePrueba   restore_test.ps1       domingo 03:30 (despues de la revision)
+      FoodStore-Integridad      integrity_check.sql    domingo 04:00 (amcheck, despues de la restauracion)
 
     Cada tarea se detiene si corre mas de 30 min (SPEC_U6.md, "Programacion prevista").
     Los horarios estan separados 30 min para que una tarea no arranque antes de que la
@@ -20,7 +21,7 @@
     que es quien tiene el pgpass.conf.
 
 .PARAMETER Quitar
-    Borra las 4 tareas en lugar de crearlas.
+    Borra las 5 tareas en lugar de crearlas.
 
 .PARAMETER ProbarAhora
     Despues de registrar, lanza FoodStore-ChequeoSalud una vez (solo lectura) para
@@ -45,7 +46,8 @@ param(
 $ErrorActionPreference = 'Stop'
 $carpeta = '\FoodStore\'
 $tp6     = $PSScriptRoot
-$nombres = 'FoodStore-Respaldo', 'FoodStore-ChequeoSalud', 'FoodStore-Mantenimiento', 'FoodStore-RestorePrueba'
+$nombres = 'FoodStore-Respaldo', 'FoodStore-ChequeoSalud', 'FoodStore-Mantenimiento', 'FoodStore-RestorePrueba',
+           'FoodStore-Integridad'
 
 if ($Quitar) {
     foreach ($n in $nombres) {
@@ -83,10 +85,14 @@ $tareas = @(
     @{ Nombre  = 'FoodStore-RestorePrueba'
        Accion  = New-AccionPs "`"$tp6\restore_test.ps1`" -Origen $Database"
        Disparo = New-ScheduledTaskTrigger -Weekly -DaysOfWeek Sunday -At '03:30'
-       Desc    = 'Restauracion de prueba semanal en foodstore_restore_test, con RTO/RPO (SPEC_U6.md).' }
+       Desc    = 'Restauracion de prueba semanal en foodstore_restore_test, con RTO/RPO (SPEC_U6.md).' },
+    @{ Nombre  = 'FoodStore-Integridad'
+       Accion  = New-AccionPs "`"$tp6\ejecutar_sql.ps1`" -Script integrity_check.sql -Prefijo integrity -Database $Database"
+       Disparo = New-ScheduledTaskTrigger -Weekly -DaysOfWeek Sunday -At '04:00'
+       Desc    = 'Verificacion semanal de integridad con amcheck: tablas e indices B-tree (SPEC_U6.md).' }
 )
 
-# --- Configuracion comun a las 4 tareas: quien las ejecuta y como se comportan ---
+# --- Configuracion comun a las 5 tareas: quien las ejecuta y como se comportan ---
 # Interactive: corre con la sesion del usuario iniciada. No guarda ninguna contrasena de
 # Windows en la tarea (regla 1 de la SPEC) y lee el pgpass.conf del usuario.
 $principal = New-ScheduledTaskPrincipal -UserId "$env:USERDOMAIN\$env:USERNAME" -LogonType Interactive
