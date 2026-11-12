@@ -1,7 +1,7 @@
 # Code Review con IA de los scripts de la cursada
 
 > **Nota metodológica y de integridad:**
-> La revisión exhaustiva de código fue realizada por un agente de solo lectura de Claude (`research`), sin acceso de escritura ni conexión a las bases de datos activas. Los scripts analizados pertenecen a la totalidad de la cursada de Bases de Datos II (TP1 a TP6 y Proyecto Integrador en el repositorio `BaseDeDatos2`, y TP7 y TP8 en el repositorio `BasesNoRelacionales`). Ningún dato personal real figura en este documento.
+> La revisión exhaustiva de código fue realizada por un agente de solo lectura de Claude (`research`), sin acceso de escritura ni conexión a las bases de datos activas. Los scripts analizados pertenecen a la totalidad de la cursada de Bases de Datos II (TP1 a TP6 y Proyecto Integrador, TP7 y TP8, todos en este repositorio (TP7 y TP8 fueron importados desde el repositorio original del TP7)). Ningún dato personal real figura en este documento.
 
 ---
 
@@ -10,89 +10,89 @@
 Total de scripts analizados: **107 scripts** distribuidos en 9 componentes.
 
 ### TP1 (1 script)
-- `../../BaseDeDatos2/TP1/schema.sql`
+- `../../TP1/schema.sql`
 
 ### TP2 (2 scripts)
-- `../../BaseDeDatos2/TP2/restricciones_tp2.sql`
-- `../../BaseDeDatos2/TP2/seed.sql`
+- `../../TP2/restricciones_tp2.sql`
+- `../../TP2/seed.sql`
 
 ### TP3 (5 scripts)
-- `../../BaseDeDatos2/TP3/gen_pdf.py`
-- `../../BaseDeDatos2/TP3/indices.sql`
-- `../../BaseDeDatos2/TP3/materializadas.sql`
-- `../../BaseDeDatos2/TP3/queries.sql`
-- `../../BaseDeDatos2/TP3/views.sql`
+- `../../TP3/gen_pdf.py`
+- `../../TP3/indices.sql`
+- `../../TP3/materializadas.sql`
+- `../../TP3/queries.sql`
+- `../../TP3/views.sql`
 
 ### TP4 (17 scripts)
-- `../../BaseDeDatos2/TP4/gen_pdf.py`
-- `../../BaseDeDatos2/TP4/tests/test_auditoria.sql`
-- `../../BaseDeDatos2/TP4/tests/test_baja_logica.sql`
-- `../../BaseDeDatos2/TP4/tests/test_concurrencia.sql`
-- `../../BaseDeDatos2/TP4/tests/test_datos_prueba.sql`
-- `../../BaseDeDatos2/TP4/tests/test_dia_negocio.sql`
-- `../../BaseDeDatos2/TP4/tests/test_fnbc_descomposicion.sql`
-- `../../BaseDeDatos2/TP4/tests/test_fnbc_esquema_original.sql`
-- `../../BaseDeDatos2/TP4/tests/test_fnbc_restricciones_indices.sql`
-- `../../BaseDeDatos2/TP4/tests/test_fnbc_vista_migracion.sql`
-- `../../BaseDeDatos2/TP4/tests/test_reporte_top5.sql`
-- `../../BaseDeDatos2/TP4/tests/test_reversibilidad.sql`
-- `../../BaseDeDatos2/TP4/tests/test_trigger_detalle.sql`
-- `../../BaseDeDatos2/TP4/tests/test_trigger_pedido_producto.sql`
-- `../../BaseDeDatos2/TP4/tests/test_ventas_diarias_estructura.sql`
-- `../../BaseDeDatos2/TP4/tp_desnormalizacion_top_categorias.sql`
-- `../../BaseDeDatos2/TP4/tp_fnbc_control_lote.sql`
+- `../../TP4/gen_pdf.py`
+- `../../TP4/tests/test_auditoria.sql`
+- `../../TP4/tests/test_baja_logica.sql`
+- `../../TP4/tests/test_concurrencia.sql`
+- `../../TP4/tests/test_datos_prueba.sql`
+- `../../TP4/tests/test_dia_negocio.sql`
+- `../../TP4/tests/test_fnbc_descomposicion.sql`
+- `../../TP4/tests/test_fnbc_esquema_original.sql`
+- `../../TP4/tests/test_fnbc_restricciones_indices.sql`
+- `../../TP4/tests/test_fnbc_vista_migracion.sql`
+- `../../TP4/tests/test_reporte_top5.sql`
+- `../../TP4/tests/test_reversibilidad.sql`
+- `../../TP4/tests/test_trigger_detalle.sql`
+- `../../TP4/tests/test_trigger_pedido_producto.sql`
+- `../../TP4/tests/test_ventas_diarias_estructura.sql`
+- `../../TP4/tp_desnormalizacion_top_categorias.sql`
+- `../../TP4/tp_fnbc_control_lote.sql`
 
 ### TP5 (12 scripts)
-- `../../BaseDeDatos2/TP5/scripts/anonimizar_log.py`
-- `../../BaseDeDatos2/TP5/scripts/test_anonimizar_log.py`
-- `../../BaseDeDatos2/TP5/sql/auditoria_config.sql`
-- `../../BaseDeDatos2/TP5/sql/auditoria_test.sql`
-- `../../BaseDeDatos2/TP5/sql/equivalencia_usuario_anon.sql`
-- `../../BaseDeDatos2/TP5/sql/roles.sql`
-- `../../BaseDeDatos2/TP5/sql/simulacro_incidente.sql`
-- `../../BaseDeDatos2/TP5/sql/test_roles.sql`
-- `../../BaseDeDatos2/TP5/sql/test_usuario_anon.sql`
-- `../../BaseDeDatos2/TP5/sql/usuario_anon.sql`
-- `../../BaseDeDatos2/TP5/sql/usuario_autenticacion.sql`
-- `../../BaseDeDatos2/TP5/sql/verificacion_roles.sql`
+- `../../TP5/scripts/anonimizar_log.py`
+- `../../TP5/scripts/test_anonimizar_log.py`
+- `../../TP5/sql/auditoria_config.sql`
+- `../../TP5/sql/auditoria_test.sql`
+- `../../TP5/sql/equivalencia_usuario_anon.sql`
+- `../../TP5/sql/roles.sql`
+- `../../TP5/sql/simulacro_incidente.sql`
+- `../../TP5/sql/test_roles.sql`
+- `../../TP5/sql/test_usuario_anon.sql`
+- `../../TP5/sql/usuario_anon.sql`
+- `../../TP5/sql/usuario_autenticacion.sql`
+- `../../TP5/sql/verificacion_roles.sql`
 
 ### TP6 (7 scripts)
-- `../../BaseDeDatos2/TP6/backup_foodstore.ps1`
-- `../../BaseDeDatos2/TP6/health_check.sql`
-- `../../BaseDeDatos2/TP6/informe/generar_pdf.sh`
-- `../../BaseDeDatos2/TP6/maintenance.sql`
-- `../../BaseDeDatos2/TP6/restore_test.ps1`
-- `../../BaseDeDatos2/TP6/tests/test_maintenance.sh`
-- `../../BaseDeDatos2/TP6/tests/test_restore.sh`
+- `../../TP6/backup_foodstore.ps1`
+- `../../TP6/health_check.sql`
+- `../../TP6/informe/generar_pdf.sh`
+- `../../TP6/maintenance.sql`
+- `../../TP6/restore_test.ps1`
+- `../../TP6/tests/test_maintenance.sh`
+- `../../TP6/tests/test_restore.sh`
 
 ### Proyecto Integrador (27 scripts)
-- `../../BaseDeDatos2/Proyecto_Integrador/database/consultas_avanzadas.sql`
-- `../../BaseDeDatos2/Proyecto_Integrador/database/generar_registros_adaptado.sql`
-- `../../BaseDeDatos2/Proyecto_Integrador/database/indices_parciales_soft_delete.sql`
-- `../../BaseDeDatos2/Proyecto_Integrador/database/materializadas.sql`
-- `../../BaseDeDatos2/Proyecto_Integrador/database/procedures.sql`
-- `../../BaseDeDatos2/Proyecto_Integrador/database/schema.sql`
-- `../../BaseDeDatos2/Proyecto_Integrador/database/seed.sql`
-- `../../BaseDeDatos2/Proyecto_Integrador/database/test_procedures.sql`
-- `../../BaseDeDatos2/Proyecto_Integrador/database/tests_tp4/test_auditoria.sql`
-- `../../BaseDeDatos2/Proyecto_Integrador/database/tests_tp4/test_baja_logica.sql`
-- `../../BaseDeDatos2/Proyecto_Integrador/database/tests_tp4/test_concurrencia.sql`
-- `../../BaseDeDatos2/Proyecto_Integrador/database/tests_tp4/test_datos_prueba.sql`
-- `../../BaseDeDatos2/Proyecto_Integrador/database/tests_tp4/test_dia_negocio.sql`
-- `../../BaseDeDatos2/Proyecto_Integrador/database/tests_tp4/test_fnbc_descomposicion.sql`
-- `../../BaseDeDatos2/Proyecto_Integrador/database/tests_tp4/test_fnbc_esquema_original.sql`
-- `../../BaseDeDatos2/Proyecto_Integrador/database/tests_tp4/test_fnbc_restricciones_indices.sql`
-- `../../BaseDeDatos2/Proyecto_Integrador/database/tests_tp4/test_fnbc_vista_migracion.sql`
-- `../../BaseDeDatos2/Proyecto_Integrador/database/tests_tp4/test_reporte_top5.sql`
-- `../../BaseDeDatos2/Proyecto_Integrador/database/tests_tp4/test_reversibilidad.sql`
-- `../../BaseDeDatos2/Proyecto_Integrador/database/tests_tp4/test_trigger_detalle.sql`
-- `../../BaseDeDatos2/Proyecto_Integrador/database/tests_tp4/test_trigger_pedido_producto.sql`
-- `../../BaseDeDatos2/Proyecto_Integrador/database/tests_tp4/test_ventas_diarias_estructura.sql`
-- `../../BaseDeDatos2/Proyecto_Integrador/database/tp4_datos_prueba_top_categorias.sql`
-- `../../BaseDeDatos2/Proyecto_Integrador/database/tp4_desnormalizacion_top_categorias.sql`
-- `../../BaseDeDatos2/Proyecto_Integrador/database/tp4_fnbc_control_lote.sql`
-- `../../BaseDeDatos2/Proyecto_Integrador/database/triggers.sql`
-- `../../BaseDeDatos2/Proyecto_Integrador/database/views.sql`
+- `../../Proyecto_Integrador/database/consultas_avanzadas.sql`
+- `../../Proyecto_Integrador/database/generar_registros_adaptado.sql`
+- `../../Proyecto_Integrador/database/indices_parciales_soft_delete.sql`
+- `../../Proyecto_Integrador/database/materializadas.sql`
+- `../../Proyecto_Integrador/database/procedures.sql`
+- `../../Proyecto_Integrador/database/schema.sql`
+- `../../Proyecto_Integrador/database/seed.sql`
+- `../../Proyecto_Integrador/database/test_procedures.sql`
+- `../../Proyecto_Integrador/database/tests_tp4/test_auditoria.sql`
+- `../../Proyecto_Integrador/database/tests_tp4/test_baja_logica.sql`
+- `../../Proyecto_Integrador/database/tests_tp4/test_concurrencia.sql`
+- `../../Proyecto_Integrador/database/tests_tp4/test_datos_prueba.sql`
+- `../../Proyecto_Integrador/database/tests_tp4/test_dia_negocio.sql`
+- `../../Proyecto_Integrador/database/tests_tp4/test_fnbc_descomposicion.sql`
+- `../../Proyecto_Integrador/database/tests_tp4/test_fnbc_esquema_original.sql`
+- `../../Proyecto_Integrador/database/tests_tp4/test_fnbc_restricciones_indices.sql`
+- `../../Proyecto_Integrador/database/tests_tp4/test_fnbc_vista_migracion.sql`
+- `../../Proyecto_Integrador/database/tests_tp4/test_reporte_top5.sql`
+- `../../Proyecto_Integrador/database/tests_tp4/test_reversibilidad.sql`
+- `../../Proyecto_Integrador/database/tests_tp4/test_trigger_detalle.sql`
+- `../../Proyecto_Integrador/database/tests_tp4/test_trigger_pedido_producto.sql`
+- `../../Proyecto_Integrador/database/tests_tp4/test_ventas_diarias_estructura.sql`
+- `../../Proyecto_Integrador/database/tp4_datos_prueba_top_categorias.sql`
+- `../../Proyecto_Integrador/database/tp4_desnormalizacion_top_categorias.sql`
+- `../../Proyecto_Integrador/database/tp4_fnbc_control_lote.sql`
+- `../../Proyecto_Integrador/database/triggers.sql`
+- `../../Proyecto_Integrador/database/views.sql`
 
 ### TP7 (11 scripts)
 - `../consultas_mongodb.js`
@@ -139,7 +139,7 @@ Total de scripts analizados: **107 scripts** distribuidos en 9 componentes.
 ## 2. Prompt enviado al agente revisor de IA
 
 ```text
-Sos un agente de code review de solo lectura. Se te solicita realizar una revision tecnica de los scripts de la cursada de Bases de Datos II, especialmente de TP7 y TP8 (en este repo) y de TP1 a TP6 / Proyecto Integrador (en ../../BaseDeDatos2/).
+Sos un agente de code review de solo lectura. Se te solicita realizar una revision tecnica de los scripts de la cursada de Bases de Datos II, especialmente de TP7 y TP8 (en este repo) y de TP1 a TP6 / Proyecto Integrador (en este mismo repo, en las carpetas `TP1/` a `TP6/` y `Proyecto_Integrador/`).
 
 Criterios de analisis:
 1. Correctitud: consultas, tipos, comparaciones.

@@ -4,7 +4,7 @@
 
 TP Unidad 8 de Bases de Datos II. El food truck vende en una feria sin señal. La tablet tiene una base SQLite donde solo consulta el catálogo y arma borradores; la sincronización con PostgreSQL se **simula** con un semáforo. **El móvil propone, el servidor dispone**: precio, stock y ventas los decide PostgreSQL, y `SIMULADO_APROBADO` no es una venta.
 
-El TP vive en la carpeta `TP8/` del repositorio del TP7, rama `tp8`, etiqueta `tp8`.
+El TP vive en la carpeta `TP8/` de este repositorio (BaseDeDatos2), junto con `TP7/` y `TP1/` a `TP6/`. Fue desarrollado originalmente en el repositorio del TP7 (rama `tp8`, etiqueta `tp8`) y luego importado acá.
 
 ## Contenido
 
