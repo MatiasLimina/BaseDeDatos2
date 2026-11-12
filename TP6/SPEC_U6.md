@@ -13,7 +13,7 @@ Integrantes: Matias Limina - Nicolas Monjelardi - Lautaro Aguero
 | Revisión de mantenimiento | `maintenance.sql` | Semanal, domingo | Muestra tuplas muertas frente al umbral de autovacuum, la configuración de autovacuum y la antigüedad de las estadísticas. Solo ejecuta `VACUUM (ANALYZE)` o `ANALYZE` sobre las tablas que superan el umbral en esa misma observación. |
 | Restauración de prueba | `restore_test.ps1` | Semanal, domingo, después de la revisión | La última copia se restaura en `foodstore_restore_test`. Los conteos por tabla coinciden con los que se registraron antes del respaldo y los controles de productos y detalles inválidos devuelven 0. Se registran el RTO y el RPO observados. |
 
-Programación prevista: Programador de tareas de Windows, con un tiempo máximo de ejecución de 30 min por tarea ("Detener la tarea si se ejecuta durante más de"). Antes de programarse, cada script se ejecuta y se verifica a mano.
+Programación: Programador de tareas de Windows, con un tiempo máximo de ejecución de 30 min por tarea ("Detener la tarea si se ejecuta durante más de"). Antes de programarse, cada script se ejecuta y se verifica a mano. Las 4 tareas las registra `registrar_tareas.ps1` en la carpeta `\FoodStore\` (horarios: 02:00, 02:30, domingo 03:00 y domingo 03:30), como el usuario que tiene el `pgpass.conf`, con inicio de sesión interactivo (no se guarda ninguna contraseña de Windows) y "iniciar en cuanto sea posible" si el equipo estaba apagado a la hora programada. Los `.sql` se ejecutan a través de `ejecutar_sql.ps1`, que deja la salida fechada en `logs/` y una línea `OK`/`ERROR` en `logs/tareas_programadas.log`. En un equipo donde la base tiene otro nombre se registra con `-Database <base>`.
 
 ## Reglas de seguridad
 

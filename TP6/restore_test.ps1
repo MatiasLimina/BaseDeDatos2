@@ -3,7 +3,8 @@
     Restauracion de prueba semanal del ultimo respaldo (SPEC_U6.md, Parte 4).
 
 .DESCRIPTION
-    1. Toma el ultimo backups\foodstore_<fecha>_<hora>.dump y su .counts.csv.
+    1. Toma el ultimo backups\<Origen>_<fecha>_<hora>.dump (por defecto foodstore_...)
+       y su .counts.csv.
     2. Calcula el RPO observado: antiguedad del respaldo al comenzar el simulacro.
     3. Borra foodstore_restore_test si existe (fuera del cronometro).
     4. Cronometro: createdb + pg_restore --no-owner --no-privileges + validaciones
@@ -26,6 +27,10 @@ param(
     [int]   $Port      = 5432,
     [string]$User      = 'postgres',
     [string]$Target    = 'foodstore_restore_test',
+    # Base de la que salio el respaldo: backup_foodstore.ps1 nombra el archivo
+    # <base>_<fecha>_<hora>.dump. Solo elige que respaldos buscar; el destino sigue
+    # siendo unicamente foodstore_restore_test.
+    [string]$Origen    = 'foodstore',
     [string]$BackupDir,
     [string]$LogDir
 )
@@ -110,9 +115,9 @@ try {
     #    cronologico. Si backup_foodstore.ps1 esta escribiendo en ese momento (o dejo un
     #    parcial), se toma ese archivo y pg_restore falla: el simulacro termina en ERROR y
     #    no vuelve solo al respaldo anterior. No hay que programarlo junto con el respaldo.
-    $dump = Get-ChildItem -Path $BackupDir -Filter 'foodstore_*.dump' -ErrorAction SilentlyContinue |
+    $dump = Get-ChildItem -Path $BackupDir -Filter "${Origen}_*.dump" -ErrorAction SilentlyContinue |
             Sort-Object Name -Descending | Select-Object -First 1
-    if (-not $dump) { throw "no hay respaldos foodstore_*.dump en $BackupDir" }
+    if (-not $dump) { throw "no hay respaldos ${Origen}_*.dump en $BackupDir" }
     if ($dump.Name -notmatch '_(\d{8}_\d{6})\.dump$') {
         throw "$($dump.Name) no tiene fecha y hora en el nombre"
     }
