@@ -1,5 +1,5 @@
 # Trabajo Práctico Integrador (TPI) — Informe Técnico Consolidado
-## Base de Datos II · Proyecto «Food Store» · Motor: PostgreSQL 16+
+## Base de Datos II · Proyecto «Food Store» · Motores: PostgreSQL 16+, MongoDB y SQLite
 
 ---
 
@@ -11,7 +11,8 @@
   - **Matias Limina**
   - **Nicolas Monjelardi**
   - **Lautaro Aguero**
-- **Motor de Base de Datos de Referencia:** PostgreSQL 16+ (con soporte nativo para PL/pgSQL, tipos `ENUM`, columnas `IDENTITY`, tipo `JSONB`, llamadas transaccionales `CALL` y vistas materializadas).
+- **Motor de Base de Datos de Referencia:** PostgreSQL 16+ (con soporte nativo para PL/pgSQL, tipos `ENUM`, columnas `IDENTITY`, tipo `JSONB`, llamadas transaccionales `CALL` y vistas materializadas). A partir de la segunda entrega se suman **MongoDB** (modelo documental de pedidos, Unidad 7) y **SQLite** (base local de la tablet, Unidad 8).
+- **Alcance del informe:** este documento cubre **las dos entregas**: la primera (Unidades 1 a 3, secciones 1.1 y 2 a 7) y la segunda (Unidades 4 a 8, secciones 1.2, 8 a 12).
 - **Repositorio / Espacio de Trabajo:** `BaseDeDatos2`
 
 ---
@@ -35,10 +36,19 @@
 6. [Eje 5: Declaración de Uso de Inteligencia Artificial (DUIA Unificado)](#6-eje-5-declaración-de-uso-de-inteligencia-artificial-duia-unificado)
 7. [Conclusiones y Próximos Pasos](#7-conclusiones-y-próximos-pasos)
 8. [Extensión TP4: FNBC y desnormalización controlada](#8-extensión-tp4-fnbc-y-desnormalización-controlada)
+   - [8.6 Resumen para la segunda entrega (Unidad 4)](#86-resumen-para-la-segunda-entrega-unidad-4)
+9. [Unidad 5: Administración y seguridad (roles, auditoría e incidente)](#9-unidad-5-administración-y-seguridad-roles-auditoría-e-incidente)
+10. [Unidad 6: Mantenimiento, respaldo y recuperación](#10-unidad-6-mantenimiento-respaldo-y-recuperación)
+11. [Unidad 7: Modelo documental (MongoDB) frente a PostgreSQL](#11-unidad-7-modelo-documental-mongodb-frente-a-postgresql)
+12. [Unidad 8: Base móvil (SQLite), sincronización y cierre de la capa de datos](#12-unidad-8-base-móvil-sqlite-sincronización-y-cierre-de-la-capa-de-datos)
+
+Dentro de la sección 1, la tabla de la primera entrega es el apartado 1.1 y la de la segunda, el 1.2.
 
 ---
 
 ## 1. Matriz de Trazabilidad y Cobertura de Objetivos
+
+### 1.1 Primera entrega (Unidades 1 a 3)
 
 A continuación se detalla la matriz de cumplimiento explícito de los **9 objetivos de evaluación** fijados por las condiciones de la cátedra:
 
@@ -53,6 +63,32 @@ A continuación se detalla la matriz de cumplimiento explícito de los **9 objet
 | **7** | **Reglas de Negocio** (`CHECK`, `UNIQUE`, triggers PL/pgSQL). | **Cumplido** | `triggers.sql`, `schema.sql`, `restricciones_tp2.sql` | §2.7 (Triggers de validación de cliente/producto activo y `CHECK` de stock). |
 | **8** | **Transacciones y Concurrencia** (atomicidad, COMMIT/ROLLBACK, aislamiento). | **Cumplido** | `informe_concurrencia.md`, `test_procedures.sql` | §2.8 (Pruebas de niveles `READ COMMITTED`, `REPEATABLE READ`, bloqueos `FOR UPDATE`). |
 | **9** | **Borrado Lógico (*Soft Delete*)** e impacto en índices y consultas. | **Cumplido** | `indices_parciales_soft_delete.sql`, `views.sql` | §2.9 (Índices parciales `WHERE activo = TRUE` y filtrado consistente). |
+
+### 1.2 Segunda entrega (Unidades 4 a 8)
+
+Cada fila de la consigna de la segunda entrega apunta a evidencia verificable en la carpeta de su unidad (`TP4/` a `TP8/`). Los trabajos viven en esas carpetas y no se copiaron a `Proyecto_Integrador/`, salvo la integración del TP4 descripta en la sección 8. Los enlaces son relativos a este documento. Donde algo quedó incompleto, el estado dice **Parcial** y explica el motivo.
+
+| Unidad | Objetivo de la consigna | Estado | Archivos y scripts | Sección del informe |
+|---|---|:---:|---|---|
+| **U4** | Refactor del esquema heredado a FNBC, validado contra dependencias funcionales reales. | **Cumplido** | [`TP4/informe_tp4.md`](../../TP4/informe_tp4.md), [`TP4/tp_fnbc_control_lote.sql`](../../TP4/tp_fnbc_control_lote.sql), [`TP4/tests/`](../../TP4/tests/) | §8.1, §8.6 |
+| **U4** | Migración de datos sin pérdida, dentro de transacciones reversibles, especificada (OPSX en lugar de Kiro) con plan de reversión obligatorio. | **Cumplido** | [Change OPSX archivado](../../openspec/changes/archive/2026-10-18-tp4-fnbc-desnormalizacion/) (`design.md` con el plan de reversión), [`openspec/specs/`](../../openspec/specs/), [`TP4/tests/test_reversibilidad.sql`](../../TP4/tests/test_reversibilidad.sql), [`TP4/pruebas_manuales.md`](../../TP4/pruebas_manuales.md) (prueba 28) | §8.1, §8.6 |
+| **U4** | Decisiones documentadas de desnormalización controlada (cuándo, por qué, salvaguardas). | **Cumplido, con salvedad** | [`TP4/tp_desnormalizacion_top_categorias.sql`](../../TP4/tp_desnormalizacion_top_categorias.sql), [`TP4/evidencias/`](../../TP4/evidencias/), [`TP4/informe_tp4.md`](../../TP4/informe_tp4.md) | §8.2, §8.6 |
+| **U5** | Usuarios, roles y permisos con mínimo privilegio. | **Cumplido** | [`TP5/sql/roles.sql`](../../TP5/sql/roles.sql), [`TP5/sql/test_roles.sql`](../../TP5/sql/test_roles.sql), [`TP5/docs/kiro_roles_spec/`](../../TP5/docs/kiro_roles_spec/), [`TP5/docs/verificacion_permisos.md`](../../TP5/docs/verificacion_permisos.md) | §9 |
+| **U5** | Auditoría de accesos y operaciones, activada y probada con un simulacro de acceso indebido reconstruido desde el log, con propuesta de contención. | **Cumplido** | [`TP5/sql/auditoria_config.sql`](../../TP5/sql/auditoria_config.sql), [`TP5/docs/informe_auditoria.md`](../../TP5/docs/informe_auditoria.md), [`TP5/sql/simulacro_incidente.sql`](../../TP5/sql/simulacro_incidente.sql), [`TP5/docs/informe_incidente.md`](../../TP5/docs/informe_incidente.md) | §9 |
+| **U5** | Auditoría de seguridad asistida por IA del esquema de permisos, con decisión humana final documentada. | **Cumplido** | [`TP5/docs/ia/opencode_auditoria_roles.md`](../../TP5/docs/ia/opencode_auditoria_roles.md), [`TP5/BITACORA.md`](../../TP5/BITACORA.md) (registro A-5) | §9 |
+| **U6** | Plan de mantenimiento completo: respaldo programado, restauración probada y tareas de rutina (estadísticas, limpieza, chequeo de integridad), automatizado y documentado. | **Parcial** | [`TP6/SPEC_U6.md`](../../TP6/SPEC_U6.md), [`TP6/backup_foodstore.ps1`](../../TP6/backup_foodstore.ps1), [`TP6/maintenance.sql`](../../TP6/maintenance.sql), [`TP6/health_check.sql`](../../TP6/health_check.sql), [`TP6/restore_test.ps1`](../../TP6/restore_test.ps1), [`TP6/registrar_tareas.ps1`](../../TP6/registrar_tareas.ps1), [`TP6/evidencias/parte2_tareas_programadas.txt`](../../TP6/evidencias/parte2_tareas_programadas.txt) | §10 |
+| **U6** | Simulacro de desastre: restauración del último respaldo contra reloj, con informe post-incidente. | **Cumplido** | [`TP6/evidencias/parte4_simulacro.md`](../../TP6/evidencias/parte4_simulacro.md), [`TP6/informe_u6.pdf`](../../TP6/informe_u6.pdf) | §10 |
+| **U7** | Modelado de parte del dominio en una base documental, con consultas generadas y verificadas sobre datos reales. | **Cumplido** | [`TP7/docs/modelo_documental.md`](../../TP7/docs/modelo_documental.md), [`TP7/consultas_mongodb.js`](../../TP7/consultas_mongodb.js), [`TP7/consultas_postgresql.sql`](../../TP7/consultas_postgresql.sql), [`TP7/docs/consultas_verificacion.md`](../../TP7/docs/consultas_verificacion.md) | §11 |
+| **U7** | Comparación práctica documental frente a relacional, con justificación de la tecnología elegida. | **Cumplido** | [`TP7/docs/contraste_ia.md`](../../TP7/docs/contraste_ia.md), [`TP7/evidencias/`](../../TP7/evidencias/), [`TP7/informe_tp7.pdf`](../../TP7/informe_tp7.pdf) | §11 |
+| **U8** | Base SQLite del dominio con esquema y sincronización especificados (OPSX en lugar de Kiro). | **Cumplido** | [`TP8/movil/schema_sqlite.sql`](../../TP8/movil/schema_sqlite.sql), [`TP8/docs/kiro/`](../../TP8/docs/kiro/), [`TP8/openspec/specs/`](../../TP8/openspec/specs/) | §12 |
+| **U8** | Sincronización simulada contra el servidor, con casos de conflicto probados y su resolución mostrada. | **Cumplido** | [`TP8/movil/semaforo.sql`](../../TP8/movil/semaforo.sql), [`TP8/scripts/correr_casos.sh`](../../TP8/scripts/correr_casos.sh), [`TP8/evidencias/`](../../TP8/evidencias/) | §12 |
+| **U8** | Code review final asistido por IA de todos los scripts de la cursada, con decisión humana por hallazgo. | **Cumplido** | [`TP8/docs/code_review_ia.md`](../../TP8/docs/code_review_ia.md) | §12 |
+| **U8** | Capa de datos completa (relacional, documental, móvil) con specs, scripts versionados, plan de mantenimiento y bitácora de IA. | **Cumplido** | [`TP8/docs/plan_mantenimiento_tp8.md`](../../TP8/docs/plan_mantenimiento_tp8.md), [`TP8/docs/bitacora_ia.md`](../../TP8/docs/bitacora_ia.md), [`TP8/docs/DUIA.md`](../../TP8/docs/DUIA.md) | §12 |
+
+**Salvedades y estados parciales**
+- **U4, desnormalización.** La prueba manual 27 (concurrencia con dos sesiones) se ejecutó sólo en la variante 1. Las variantes 2 a 4 (en particular la reactivación concurrente de un pedido) **no se corrieron en vivo**; su resultado se razonó con la matriz de bloqueos de PostgreSQL ([`TP4/pruebas_manuales.md`](../../TP4/pruebas_manuales.md)). Además, los archivos `tp4_*.sql` integrados a `Proyecto_Integrador/database/` sólo se verificaron por MCP, sentencia por sentencia; la corrida completa con `psql -f` sigue pendiente (§8.5).
+- **U6, plan de mantenimiento.** La programación ya está configurada: las 4 tareas están registradas en el Programador de tareas de Windows (`registrar_tareas.ps1`) y su primera corrida desde el Programador terminó con resultado 0 en las cuatro ([`parte2_tareas_programadas.txt`](../../TP6/evidencias/parte2_tareas_programadas.txt)). Lo que sigue pendiente es el chequeo de integridad física de PostgreSQL (por ejemplo `amcheck` o sumas de verificación) no es parte del plan: la integridad se controla con los conteos y los controles de filas inválidas de la restauración de prueba. Se buscó `amcheck`, `checksum`, `REINDEX` e `integridad` en `TP6/`.
+- **U8, referencias cruzadas.** `TP8/docs/code_review_ia.md` conserva rutas del repositorio separado en el que se trabajó el TP8 (`../../BaseDeDatos2/...`, «BasesNoRelacionales»). El archivo no se modificó; el inventario cubre igualmente TP1 a TP8 (§12).
 
 ---
 
@@ -521,14 +557,46 @@ flowchart TD
 | **TP3 / Procedimientos y JSONB** | Antigravity AI | Procedimiento almacenado para compra multi-ítem con JSONB | `sp_registrar_pedido` con parseo JSONB y `FOR UPDATE`. | Parseo de arreglos JSONB y actualización automática de stock con bloqueos. | **Corregido:** La IA omitió validar que el array JSONB no viniera vacío (`jsonb_array_length = 0`). Se agregó la guarda defensiva correspondiente. |
 | **TP3 / Optimización** | Antigravity AI | Propuestas de índices para queries Q1, Q2 y Q3 | Índices sobre `fecha`, `producto_id` y `subtotal`. | Creación de `idx_pedido_fecha` que resolvió el cuello de botella de Q1. | **Descartado:** La IA sugirió un índice compuesto `(fecha, forma_pago)`. Se descartó por baja cardinalidad de `forma_pago` (4 valores); el índice simple sobre `fecha` demostró ser más liviano y eficiente. |
 
+### Segunda entrega (Unidades 4 a 8)
+
+Las filas siguientes resumen las decisiones más significativas de cada unidad. **Los registros completos, con el prompt y la respuesta literales y la verificación de cada paso, están en los archivos enlazados**: [`TP5/BITACORA.md`](../../TP5/BITACORA.md) (más la evidencia literal de OpenCode en [`TP5/docs/ia/`](../../TP5/docs/ia/)), [`TP6/BITACORA.md`](../../TP6/BITACORA.md), [`TP7/docs/ia/consulta_ia.md`](../../TP7/docs/ia/consulta_ia.md) con [`TP7/docs/contraste_ia.md`](../../TP7/docs/contraste_ia.md), y [`TP8/docs/bitacora_ia.md`](../../TP8/docs/bitacora_ia.md) con [`TP8/docs/DUIA.md`](../../TP8/docs/DUIA.md). **El TP4 no tiene una bitácora de IA propia**: lo que se declara abajo sale de su change OPSX y de su informe, y no de un registro de prompts.
+
+| Etapa / Unidad | Herramienta y modelo | Solicitud / Prompt | Código / Solución generada | Decisión: ¿Qué se aceptó? | Decisión: ¿Qué se descartó o corrigió? |
+|---|---|---|---|---|---|
+| **TP4 / FNBC y desnormalización** | Claude Code con OPSX y el MCP `postgres` (herramientas autorizadas por la cátedra, §6.1) | Propuesta, diseño, specs y tareas del change [`tp4-fnbc-desnormalizacion`](../../openspec/changes/archive/2026-10-18-tp4-fnbc-desnormalizacion/) | Scripts de la descomposición FNBC y de la tabla de totales con disparadores, y 14 tests `DO $$ ... ASSERT`. | Tests escritos antes que el código; tabla de totales con disparadores y no vista materializada; reversión sin tocar la fuente. | **Corregido:** `psql` leía el script con la codificación de la consola y duplicaba categorías acentuadas; se agregó `SET client_encoding = 'UTF8'`. **Decisión del equipo:** no imponer con disparador la dependencia que la FNBC no preserva, sólo documentarla y demostrarla. |
+| **TP5 / Roles (Parte A)** | OpenCode con `deepseek-v4.1-flash-free`; luego Claude Code (Claude Opus 5.5) | Especificación y `roles.sql` de mínimo privilegio (prompt en [`opencode_parte_a_generacion.md`](../../TP5/docs/ia/opencode_parte_a_generacion.md)) | Especificación, `roles.sql` y consultas de verificación. | Estructura de siete roles y verificación contra el catálogo. | **Corregido:** la IA dio a `admin_datos` permisos que permitían escalar a `ADMIN`, y dejó el riesgo documentado sin corregirlo. El equipo lo detectó al revisar y lo cerró con un test que falla si vuelve (commit `e6d5d8f`). |
+| **TP5 / Auditoría de `roles.sql`** | OpenCode, agente `plan` de solo lectura, `gemini-3.5-flash` | «Auditá este archivo roles.sql ... con la sentencia SQL exacta» | Siete propuestas de mejora. | Propuesta 3 (refactor sin cambio de privilegios) y parte de la 7 (esquema explícito). | **Descartadas** 1, 2, 4, 5 y 6, cada una con su prueba: una rompe el script con un DBA no superusuario, otra parte de un diagnóstico incorrecto, otra crea entradas en lugar de borrarlas, otra amplía permisos sin necesidad y otra tiene una premisa falsa. |
+| **TP5 / Simulacro (Parte C)** | Claude Code (script) y OpenCode `gemini-3.5-flash` (reconstrucción) | Reconstruir el incidente a partir del log anonimizado, sin acceso al repositorio | Secuencia del ataque reconstruida. | La secuencia, las horas y la conclusión de que el control de acceso contuvo el ataque. | **Corregido:** la IA invirtió causa y consecuencia (el compromiso raíz es la credencial `app_web`) y afirmó lo que el log no puede ver. Aparte, el registro de intentos de Claude Code filtraba las claves al log (`RAISE LOG`) y se cambió a `RAISE WARNING`. |
+| **TP6 / Mantenimiento** | Claude Code (Claude Opus 5.5) con un agente revisor de solo lectura | Especificación, `backup_foodstore.ps1`, `health_check.sql`, `maintenance.sql`, `restore_test.ps1` y tests | Scripts de respaldo, chequeo, mantenimiento y restauración de prueba. | Estructura de los scripts, tests escritos antes que el script y revisión del diff antes de cada commit. | **Corregido:** el test de la IA usaba `foodstore` como destino de un caso de rechazo, con riesgo de borrarla; el control de la base destino no distinguía mayúsculas; `maintenance.sql` repetía un defecto de bloqueo. **Descartado:** reemplazar `pg_relation_size` por `relpages`, porque falla justo en las tablas nunca analizadas. |
+| **TP7 / Documental** | Agente de Claude Sonnet aislado, lanzado desde Claude Code (sin herramientas ni acceso al repositorio) | Recomendar el almacenamiento de pedidos entre PostgreSQL y MongoDB | Recomendación de combinar tecnologías, con afirmaciones técnicas. | La recomendación general y la afirmación de que el diferencial de lectura es pequeño (medido: 0,32 ms frente a menos de 1 ms). | **Corregido:** la IA dijo que MongoDB no puede validar la coherencia entre campos; el validador combinado `$jsonSchema` más `$expr` rechazó los tres intentos incoherentes. Sobre las transacciones, su afirmación era correcta pero incompleta: el MongoDB del laboratorio es *standalone* y las rechazó (código 20). |
+| **TP8 / Móvil y code review** | Claude Code con OpenSpec (en lugar de Kiro y OpenCode) | Esquema SQLite, semáforo y revisión estática de 107 scripts (TP1 a TP8) | Andamiaje del semáforo, tests y 12 hallazgos. | Tabla `snapshot_servidor` tipada antes de la importación; optimización de `consultas_postgresql.sql` (621.201 filas y 2.621 buffers pasan a 12 filas y 64); `PRAGMA foreign_keys = ON` en cada conexión. | **Descartados con prueba:** CORR-01 (el semáforo simula, no vende ni reserva stock) y CORR-03 (la carpeta del host se llama literalmente `PosgresSQL`). **Descartado:** dejar que `.import` cree la tabla, porque las columnas TEXT daban resultados erróneos en `max()` y `ORDER BY`. La expresión `CASE` del semáforo la escribió una persona del equipo. |
+
+### 6.1 Herramientas sustitutas autorizadas por la cátedra (segunda entrega, U4 a U8)
+
+La consigna de la segunda entrega pide specs de **Kiro** y scripts generados con **OpenCode**. El equipo consultó en clase al profesor el uso de herramientas equivalentes y **obtuvo su aprobación** para los dos reemplazos siguientes:
+
+| Exigido por la consigna | Herramienta usada | Dónde está la evidencia |
+|---|---|---|
+| Specs en Kiro | Ciclo **OPSX/OpenSpec** (`propose → apply → archive`): propuesta, diseño, specs delta y lista de tareas versionadas en Git | TP4: [`openspec/changes/archive/2026-10-18-tp4-fnbc-desnormalizacion/`](../../openspec/changes/archive/2026-10-18-tp4-fnbc-desnormalizacion/). El **plan de reversión** de la migración y de la desnormalización está en su `design.md` (sección de *rollback*), y los specs vigentes en [`openspec/specs/`](../../openspec/specs/). TP8: [`TP8/openspec/`](../../TP8/openspec/) |
+| Scripts generados con OpenCode | **Claude Code** (Claude Opus) en la terminal del repositorio, con la misma regla: ningún script se ejecuta sin leerlo y probarlo sobre una copia o dentro de una transacción revertida | TP6: [`TP6/BITACORA.md`](../../TP6/BITACORA.md). En TP5 se usó OpenCode como asistente principal ([`TP5/BITACORA.md`](../../TP5/BITACORA.md)) |
+
+OpenSpec cumple la misma función que Kiro: deja por escrito el *qué* (requisitos y escenarios), el *cómo* (diseño, incluido el plan de reversión) y el *paso a paso* (tareas) **antes** de generar código, y todo queda versionado junto a los scripts.
+
 ---
 
 ## 7. Conclusiones y Próximos Pasos
 
-1. **Cumplimiento Integral de Objetivos:** El proyecto «Food Store» implementa de manera verificable los **9 objetivos de evaluación** de las Unidades 1, 2 y 3, respaldado por scripts SQL probados y ejecutables.
+1. **Cumplimiento Integral de Objetivos:** El proyecto «Food Store» implementa de manera verificable los **9 objetivos de evaluación** de las Unidades 1, 2 y 3 y los objetivos de las Unidades 4 a 8 (matriz de la sección 1.2), respaldado por scripts, pruebas y evidencia ejecutables. Los puntos que quedaron parciales se declaran en la sección 1.2 y en el punto 5.
 2. **Robustez y Resiliencia:** La arquitectura combina restricciones declarativas (`CHECK`, `UNIQUE`, `FOREIGN KEY`), objetos programables PL/pgSQL transaccionales (`FOR UPDATE`, `CALL`) e índices parciales para soft-delete.
 3. **Optimización Comprobada:** Las mediciones con `EXPLAIN ANALYZE` evidencian reducciones de tiempo de hasta **99.99%** en consultas críticas de alta concurrencia.
-4. **Preparación para Etapas Futuras:** El modelo y los scripts quedan consolidados en el directorio [`Proyecto_Integrador/`](file:///d:/A_Universidad/Tercer%20semestre/Base%20de%20Datos%202/BaseDeDatos2/Proyecto_Integrador/) listos para su ampliación en las unidades posteriores de la materia.
+4. **Capa de datos completa:** El modelo relacional y sus scripts están consolidados en [`Proyecto_Integrador/`](file:///d:/A_Universidad/Tercer%20semestre/Base%20de%20Datos%202/BaseDeDatos2/Proyecto_Integrador/). Sobre esa base, las Unidades 4 a 8 agregaron la normalización FNBC y una desnormalización controlada, la seguridad y la auditoría, el mantenimiento y la recuperación, un modelo documental en MongoDB y una base SQLite para la tablet con sincronización simulada. Las tres capas (relacional, documental y móvil) tienen specs, scripts versionados, un [plan de mantenimiento](../../TP8/docs/plan_mantenimiento_tp8.md) que las cubre y bitácora de IA. La regla común es la misma: PostgreSQL es la fuente de verdad; MongoDB es una copia derivada que se regenera, y la tablet propone y el servidor decide.
+5. **Limitaciones conocidas** (tomadas de los informes de cada unidad):
+   - **U4:** la prueba de concurrencia 27 se ejecutó en vivo sólo en la variante 1; la consistencia de la tabla de totales se acota a `READ COMMITTED` y no se midió el sobrecosto de escritura de los disparadores. Los `tp4_*.sql` integrados no se corrieron completos con `psql -f` (§8.5). Además, `tp4_fnbc_control_lote.sql` crea otra tabla `usuario` y borra la existente con `DROP TABLE usuario CASCADE`, por lo que no debe ejecutarse sobre la base de la Unidad 5.
+   - **U5:** `log_statement = 'mod'` no registra lecturas, ni lo que ocurre dentro de rutinas, ni los fallos de `fn_autenticar`. Se propone pgaudit, pero no se instaló. La contención del simulacro quedó documentada y no aplicada, porque el atacante era el propio equipo.
+   - **U6:** no hay chequeo de integridad física (`amcheck`). Las tareas programadas usan inicio de sesión interactivo: si el equipo está apagado a la hora prevista, corren al volver a iniciar sesión. El respaldo no tiene archivado de WAL, así que el RPO real depende de la frecuencia del respaldo. La vista materializada `mv_facturacion_categoria_mes` de `foodstore` estaba desactualizada (1 fila contra 13 en la copia restaurada).
+   - **U7:** los 9 pedidos migrados son una muestra; los 200 000 pedidos sintéticos pertenecen a un solo cliente (4812). El MongoDB del laboratorio es *standalone* y no admite transacciones.
+   - **U8:** la sincronización es una simulación y `SIMULADO_APROBADO` no reserva stock; controlar el stock entre varias ventas queda a cargo del servidor y fuera del alcance. La prueba del respaldo de SQLite con `VACUUM INTO` se hizo sobre una base con una fila por tabla ([`respaldo_sqlite.txt`](../../TP8/evidencias/respaldo_sqlite.txt)); la contingencia ante un respaldo viejo de PostgreSQL está descripta en el plan, pero no se ejecutó como simulacro.
+   - **Datos y entornos:** los datos son sintéticos y los volúmenes difieren entre copias (`pedido_detalle` tiene 771 201 filas en `tp4_foodstore`, 621 853 en `foodstore` y 621 201 en `food_store_copia`). El TP4 se midió sobre PostgreSQL 18.6 y los TP5 a TP7 sobre 17.11.
 
 ---
 
@@ -624,3 +692,182 @@ done
 ```
 
 Si se instala `triggers.sql` **antes** de los datos de prueba, el comportamiento esperado es que la carga pueda abortar por `trg_verificar_cliente_activo` o `trg_verificar_producto_activo` (cliente 3 y producto 5 inactivos en `seed.sql`); en ese caso hay que deshabilitar esos triggers durante la carga y volver a habilitarlos después.
+
+### 8.6 Resumen para la segunda entrega (Unidad 4)
+
+Esta sección resume el TP4 con los cinco apartados que pide el informe de la segunda entrega. El detalle está en 8.1 a 8.5, en [`TP4/informe_tp4.md`](../../TP4/informe_tp4.md) y en el change de OPSX.
+
+**Especificación y plan de reversión.** Como se autorizó en 6.1, la especificación se hizo con OPSX y no con Kiro. El change [`2026-10-18-tp4-fnbc-desnormalizacion`](../../openspec/changes/archive/2026-10-18-tp4-fnbc-desnormalizacion/) tiene la propuesta (`proposal.md`), el diseño (`design.md`), las tareas (`tasks.md`) y los specs delta, que ya son specs vigentes en [`openspec/specs/`](../../openspec/specs/) (`control-lote-almacen` y `ventas-diarias-categoria`). **El plan de reversión obligatorio está en `design.md`**: la Parte 1 se revierte con `DROP` de sus propias tablas y de la vista (no comparte objetos con nada más), y la Parte 2 con `DROP` de disparadores, funciones y tabla de totales, sin tocar la fuente.
+
+#### Qué se implementó
+- Descomposición de `control_lote_almacen(LoteID, DepositoID, ResponsableControlID)` a FNBC en `responsable_deposito` y `control_lote`, con la vista `v_control_lote_almacen` para compatibilidad.
+- Tabla `ventas_diarias_categoria` mantenida por disparadores, auditoría de desincronización y reversión.
+
+#### Cómo se probó
+- 14 tests automáticos `DO $$ ... ASSERT` en [`TP4/tests/`](../../TP4/tests/), escritos antes del código. Los que modifican datos se revierten con una excepción centinela dentro del propio bloque.
+- 28 pruebas manuales ([`pruebas_manuales.md`](../../TP4/pruebas_manuales.md)) con capturas, todas sobre la copia `tp4_foodstore` y nunca sobre `food_store` ni `food_store_copia`. La prueba 28 ejecutó la reversión dentro de una transacción y comprobó que el top 5 normalizado seguía igual.
+- Migración sin pérdida: `EXCEPT` en ambos sentidos entre la tabla original y la vista, con 0 filas.
+
+#### Resultados
+- La dependencia violatoria de FNBC es `ResponsableControlID → DepositoID`. Las anomalías de inserción, borrado y actualización desaparecen. Costo asumido: la dependencia `{Lote, Depósito} → Responsable` no se preserva.
+- Top 5 de categorías: de **139,769 ms a 0,112 ms** (corrida manual del autor) y de 141,857 ms a 0,101 ms (mediana automatizada).
+- Parcial: la prueba 27 (concurrencia) sólo se ejecutó en vivo en la variante 1 (ver 1.2).
+
+#### Decisiones de diseño
+- Tabla de totales con disparadores y no vista materializada, porque ésta sólo es exacta justo después de `REFRESH`.
+- Pérdida de la dependencia no preservada: se documenta y se demuestra en una transacción revertida, y no se impone con disparador (decisión del equipo).
+- Cuándo desnormalizar: lectura mucho más frecuente que escritura y costo creciente con el volumen. Salvaguardas: actualización en la misma transacción, `FOR SHARE` sobre las filas leídas, auditoría que recalcula desde la fuente y reversión barata.
+
+#### Uso de IA
+Claude Code con OPSX y el MCP `postgres`. No hay bitácora de prompts del TP4; lo declarado está en el change y en el informe. Se aceptaron los tests previos al código y el diseño con disparadores. Se corrigió un defecto de codificación de `psql` en Windows (categorías duplicadas) con `SET client_encoding = 'UTF8'`. Ver la fila de TP4 en la sección 6.
+
+---
+
+## 9. Unidad 5: Administración y seguridad (roles, auditoría e incidente)
+
+Todo el trabajo está en [`TP5/`](../../TP5/) (índice en [`TP5/README.md`](../../TP5/README.md)) y se ejecutó en un clúster de PostgreSQL 17.11 aislado, con la base `foodstore_tp5` armada con los scripts del integrador.
+
+### 9.1 Qué se implementó
+- **Roles y permisos de mínimo privilegio** ([`roles.sql`](../../TP5/sql/roles.sql)): siete roles. Cuatro de grupo sin login (`rol_app_lectura`, `rol_app_escritura`, `rol_soporte`, `rol_reportes`), un rol técnico sin login que es dueño de las rutinas `SECURITY DEFINER` (`rol_owner_codigo`) y dos de conexión (`app_web` y `admin_datos`). Especificación en [`docs/kiro_roles_spec/`](../../TP5/docs/kiro_roles_spec/).
+- **Tabla `usuario` y `fn_autenticar`** reconstruidas en [`usuario_autenticacion.sql`](../../TP5/sql/usuario_autenticacion.sql), porque ningún script del repositorio las creaba.
+- **Auditoría del servidor** ([`auditoria_config.sql`](../../TP5/sql/auditoria_config.sql)): `log_connections`, `log_disconnections`, `log_statement = 'mod'`, un `log_line_prefix` con usuario, base, aplicación y origen, y `scram-sha-256` obligatorio por TCP en `pg_hba.conf`.
+- **Simulacro de acceso indebido** ([`simulacro_incidente.sql`](../../TP5/sql/simulacro_incidente.sql)), anonimizador de logs y tabla `usuario_anon` con prueba de equivalencia.
+
+### 9.2 Cómo se probó
+- [`test_roles.sql`](../../TP5/sql/test_roles.sql): cada defecto de permisos se reintrodujo por separado y el test falló en los cuatro casos. Verificación contra el catálogo en [`verificacion_permisos.md`](../../TP5/docs/verificacion_permisos.md).
+- [`auditoria_test.sql`](../../TP5/sql/auditoria_test.sql) (corrida `20261028T151117`): lectura, inserción, actualización y un inicio de sesión fallido, ejecutados con conexiones reales de cada rol. Log en [`log_auditoria_prueba.txt`](../../TP5/docs/log_auditoria_prueba.txt).
+- Simulacro (corrida `20261028T152428`) con la credencial de `app_web` filtrada: 5 intentos fallidos de `fn_autenticar`, un acierto, lecturas de `usuario`, `GRANT admin_datos`, `SET ROLE` y `UPDATE ... rol = 'ADMIN'`. El log se anonimizó (39 a 29 líneas) antes de dárselo a la IA.
+
+### 9.3 Resultados
+- El escalamiento **falló**: `app_web` no pasó a ser miembro de `admin_datos` y la cuenta 7 siguió siendo `USUARIO`. El `GRANT` forzado a mano hizo saltar la verificación del script, y aun así `admin_datos` no pudo promover la cuenta.
+- El log permite reconstruir quién, qué, cuándo y desde dónde. **No ve** las lecturas, lo que ocurre dentro de rutinas, los fallos de `fn_autenticar` ni el valor anterior de una fila ([`informe_auditoria.md`](../../TP5/docs/informe_auditoria.md)).
+- **Propuesta de contención** ([`informe_incidente.md`](../../TP5/docs/informe_incidente.md), §6), decidida por el equipo: rotar la clave de `app_web`, restringirla en `pg_hba.conf`, forzar el cambio de clave de la cuenta 7, no revertir roles (no cambió nada), no bloquear la IP (era `::1`), tratar como expuestas las lecturas permitidas y limitar los intentos de `fn_autenticar`. Las medidas se documentaron y no se aplicaron, porque el atacante era el propio equipo.
+- Hallazgo propio: el registro de intentos de `fn_autenticar` con `RAISE LOG` dejaba las seis claves probadas en texto plano en el log. Se corrigió a `RAISE WARNING` y el test ahora falla si vuelve.
+
+### 9.4 Decisiones de diseño
+- Ningún rol con login es dueño de objetos. La lectura pasa por vistas y la escritura crítica por `sp_registrar_pedido`, que corre con los privilegios acotados de su dueño técnico.
+- Permisos por columna sobre `usuario`: `rol_soporte` no lee `contrasena` y sólo puede resetearla con `fn_resetear_password`.
+- Se quitó a `admin_datos` la posibilidad de escalar a `ADMIN` (`INSERT/UPDATE (rol)`, `INSERT (contrasena)`, `EXECUTE fn_resetear_password`) y se revocaron `crypt` y `gen_salt` a `PUBLIC`. Riesgo residual R3 aceptado: el rol técnico lee el hash que `fn_autenticar` necesita comparar.
+- No se subió `log_statement` a `all`: volcaría al log todas las consultas con sus datos personales.
+
+### 9.5 Uso de IA
+- **Generación:** OpenCode con `deepseek-v4.1-flash-free` produjo `roles.sql` y su verificación. **Corregido:** había dado de más a `admin_datos`, y el equipo lo cerró con un test.
+- **Auditoría asistida (consigna A.4):** OpenCode con `gemini-3.5-flash` en modo de solo lectura propuso siete mejoras a `roles.sql` ([respuesta literal](../../TP5/docs/ia/opencode_auditoria_roles.md)). **Decisión humana final** ([`BITACORA.md`](../../TP5/BITACORA.md), A-5): se aceptó la 3 y parte de la 7. Se rechazaron la 1, 2, 4, 5 y 6, cada una con una prueba en el clúster (por ejemplo, la 5 creaba entradas en `pg_default_acl` en lugar de borrarlas, y la 1 rompía el script con un DBA no superusuario).
+- **Reconstrucción del incidente:** la IA acertó la secuencia, pero invirtió causa y consecuencia (el compromiso raíz es la credencial `app_web`) y afirmó lo que el log no puede ver ([contraste](../../TP5/docs/informe_incidente.md), §5).
+- Claude Code se usó para reconstruir `usuario`, escribir los tests y el anonimizador. Registro completo en [`TP5/BITACORA.md`](../../TP5/BITACORA.md).
+
+---
+
+## 10. Unidad 6: Mantenimiento, respaldo y recuperación
+
+Trabajo en [`TP6/`](../../TP6/) (índice en [`TP6/README.md`](../../TP6/README.md)), sobre `foodstore` (PostgreSQL 17.11) con 3 categorías, 20 003 clientes, 50 005 productos, 200 001 pedidos y 621 853 detalles.
+
+### 10.1 Qué se implementó
+Plan de mantenimiento en [`SPEC_U6.md`](../../TP6/SPEC_U6.md) con cuatro tareas, registradas en el Programador de tareas de Windows (carpeta `\FoodStore\`) por [`registrar_tareas.ps1`](../../TP6/registrar_tareas.ps1):
+
+| Tarea | Script | Programación |
+|---|---|---|
+| Respaldo | [`backup_foodstore.ps1`](../../TP6/backup_foodstore.ps1) (`pg_dump -Fc`, conteos previos, verificación con `pg_restore --list`) | Diaria, 02:00 |
+| Chequeo de salud | [`health_check.sql`](../../TP6/health_check.sql), vía [`ejecutar_sql.ps1`](../../TP6/ejecutar_sql.ps1) | Diaria, 02:30 |
+| Mantenimiento (estadísticas y limpieza) | [`maintenance.sql`](../../TP6/maintenance.sql): reproduce los umbrales de autovacuum, actúa sólo donde se superan, sin `VACUUM FULL` | Domingo, 03:00 |
+| Restauración de prueba | [`restore_test.ps1`](../../TP6/restore_test.ps1): sólo acepta `foodstore_restore_test` | Domingo, 03:30 |
+
+Cada tarea se corta a los 30 min, corre como el usuario dueño del `pgpass.conf` con inicio de sesión interactivo (no se guarda ninguna contraseña de Windows) y, si el equipo estaba apagado, se ejecuta en cuanto es posible.
+
+### 10.2 Cómo se probó
+- Respaldo: seis casos manuales (normal, base inexistente, sin credencial, tabla bloqueada, falla de `pg_dump` y vista materializada bloqueada) en [`parte2_respaldo.md`](../../TP6/evidencias/parte2_respaldo.md).
+- Mantenimiento: [`test_maintenance.sh`](../../TP6/tests/test_maintenance.sh) sobre una base descartable, con mutaciones del script. [`test_restore.sh`](../../TP6/tests/test_restore.sh) para la restauración, con un caso de rechazo contra una base canario.
+- **Tareas programadas** (12/11/2026): se registraron las 4 y se lanzaron desde el Programador (`Start-ScheduledTask`) sobre `food_store_copia`, que es la base de trabajo de ese equipo (621 201 detalles); `foodstore` existía sólo en el equipo del simulacro. Las cuatro terminaron con resultado 0: respaldo de 3,8 MB en 2,7 s y restauración de prueba con **RTO 11,2 s**, 5/5 conteos y 0 filas inválidas ([`parte2_tareas_programadas.txt`](../../TP6/evidencias/parte2_tareas_programadas.txt), [`parte2_tareas_programadas_logs.txt`](../../TP6/evidencias/parte2_tareas_programadas_logs.txt)). La primera prueba falló por la credencial y el envoltorio de los `.sql` lo dejó registrado como `ERROR` en el log, que es el comportamiento esperado.
+- **Simulacro de desastre** el 28/10/2026 a las 18:57:38: se restauró el último respaldo, `foodstore_20261028_181449.dump` (3,7 MB), en `foodstore_restore_test`, cronometrado y sin tocar `foodstore` (mismo OID y mismos conteos antes y después).
+
+### 10.3 Resultados
+- **RTO observado: 13,0 s** (previsto: 10 min): `createdb` 1,1 s, `pg_restore` 11,5 s y validaciones 0,4 s. **RPO observado: 42 min 49 s** (previsto: 24 h). Las 7 validaciones (cinco conteos y dos controles de filas inválidas) dieron bien y los objetos de las dos bases coinciden. Detalle en [`parte4_simulacro.md`](../../TP6/evidencias/parte4_simulacro.md).
+- **Informe post-incidente** de una página: [`informe_u6.pdf`](../../TP6/informe_u6.pdf).
+- Hallazgo real: la vista materializada de `foodstore` tenía 1 fila y la restaurada 13, porque se creó antes de la carga masiva y nunca se refrescó. Mejora propuesta: `REFRESH MATERIALIZED VIEW CONCURRENTLY` periódico.
+- Mantenimiento sobre `foodstore`: sólo se ejecutó `ANALYZE` en las dos tablas sin estadísticas (la estimación de `categoria` pasó de 360 a 3 filas).
+
+### 10.4 Decisiones de diseño
+- Formato custom (`-Fc`) y restauración con `--no-owner --no-privileges`, porque los roles son del clúster.
+- `foodstore` no se borra ni se restaura nunca. Sin contraseñas en el repositorio: `pgpass.conf` personal y `-w`.
+- Tiempos máximos: `lock_timeout` en los conteos, `--lock-wait-timeout` en `pg_dump` y 30 min por tarea. Una vista materializada bloqueada sólo la corta el tiempo máximo de la tarea: queda **mitigado, no resuelto**.
+- No hay archivado de WAL: bajar el RPO de forma permanente exige respaldos más frecuentes o recuperación a un punto en el tiempo (fuera de alcance).
+
+### 10.5 Uso de IA
+Claude Code (Claude Opus 5.5) en lugar de OpenCode, con un agente revisor de solo lectura antes de cada commit ([`BITACORA.md`](../../TP6/BITACORA.md), 9 registros). Lo más relevante:
+- **Corregido:** cuatro defectos del respaldo hallados al ejecutar; el test de la IA usaba `foodstore` como destino de un caso de rechazo (el revisor lo detectó); el control de la base destino no distinguía mayúsculas.
+- **Descartado:** la alternativa `relpages`/`reltuples` del revisor, porque falla justo en las tablas nunca analizadas.
+
+---
+
+## 11. Unidad 7: Modelo documental (MongoDB) frente a PostgreSQL
+
+Trabajo en [`TP7/`](../../TP7/) (índice en [`TP7/README.md`](../../TP7/README.md)). MongoDB 9.0.4 local, sobre la `foodstore` del TP6.
+
+### 11.1 Qué se implementó
+- Colección `pedidos` con el pedido completo en un solo documento: cabecera, datos esenciales del cliente copiados con su id y un arreglo embebido `lineas` (producto, cantidad, precio unitario histórico). Ver [`modelo_documental.md`](../../TP7/docs/modelo_documental.md).
+- Validador de la colección que combina `$jsonSchema` con `$expr` para la coherencia entre campos ([`01_crear_coleccion.js`](../../TP7/mongodb/01_crear_coleccion.js)).
+- Migración generada desde PostgreSQL ([`generar_insert_pedidos.sql`](../../TP7/migracion/generar_insert_pedidos.sql)) y la columna `estado` en `pedido` ([`00_estado_pedido.sql`](../../TP7/sql/00_estado_pedido.sql)), que la consigna pedía y el modelo no tenía.
+
+### 11.2 Cómo se probó
+- Se migraron **9 pedidos** elegidos por una regla determinista: por cada estado, el pedido de menor id con el producto 13896 y el de menor id sin él.
+- [`test_migracion.sh`](../../TP7/tests/test_migracion.sh) prueba 10 violaciones y verifica que cada una la rechace su propia regla. [`test_consultas.sh`](../../TP7/tests/test_consultas.sh) compara los ids entre motores.
+- Consultas en los dos motores ([`consultas_mongodb.js`](../../TP7/consultas_mongodb.js), [`consultas_postgresql.sql`](../../TP7/consultas_postgresql.sql)) y tabla de verificación en [`consultas_verificacion.md`](../../TP7/docs/consultas_verificacion.md).
+
+### 11.3 Resultados
+- Los ids coinciden en los tres casos: estado `ENTREGADO` (2 y 7), producto 13896 (1, 2, 20, 26 y 240) y total mayor que 20 000 (1, 20 y 26).
+- Lectura de un pedido completo: PostgreSQL 0,32 ms (cinco índices) y MongoDB menos de 1 ms (`EXPRESS_IXSCAN` por `_id`). Evidencia en [`TP7/evidencias/`](../../TP7/evidencias/).
+- Informe de 4 páginas: [`informe_tp7.pdf`](../../TP7/informe_tp7.pdf).
+
+### 11.4 Decisiones de diseño y tecnología elegida
+**Conviene mantener PostgreSQL como fuente de verdad y usar MongoDB, si hiciera falta, sólo como copia de lectura derivada** ([`contraste_ia.md`](../../TP7/docs/contraste_ia.md)). Criterios:
+1. **Integridad y atomicidad.** MongoDB validó dentro del documento lo que parecía imposible (`subtotal = cantidad × precio` y `total = Σ subtotales`), pero no tiene claves foráneas ni, en el laboratorio *standalone*, transacciones (error 20).
+2. **Patrón de acceso.** El documento embebido resuelve el pedido con una lectura, pero PostgreSQL lo hizo en 0,32 ms: a esta escala no justifica un segundo motor.
+3. **Duplicación.** Embeber al cliente lo copia en cada pedido; el cliente 4812 tiene 200 000 pedidos. En PostgreSQL es una fila.
+
+### 11.5 Uso de IA
+Un agente de Claude Sonnet aislado (sin herramientas ni acceso al repositorio) respondió con su conocimiento ([prompt y respuesta](../../TP7/docs/ia/consulta_ia.md)); la consigna pide contrastar sus afirmaciones.
+- **Descartada** (incorrecta en lo que importa): «la coherencia entre precio, subtotal y total sólo puede garantizarla la aplicación». El validador con `$expr` rechazó con el error 121 un subtotal incoherente, un total incoherente y un `updateOne` que desincronizaba el total.
+- **Aceptada con corrección** (correcta pero incompleta): las transacciones multidocumento existen, pero exigen un conjunto de réplicas. El MongoDB del laboratorio respondió `IllegalOperation` (código 20).
+- **Aceptada** tras medirla: el diferencial de lectura es pequeño a esta escala.
+- **Aceptada:** la recomendación de combinar tecnologías, por las razones corregidas de 11.4. El resto del TP se hizo con Claude Code.
+
+---
+
+## 12. Unidad 8: Base móvil (SQLite), sincronización y cierre de la capa de datos
+
+Trabajo en [`TP8/`](../../TP8/) (índice en [`TP8/README.md`](../../TP8/README.md)). La tablet del food truck vende en una feria sin señal: consulta el catálogo y arma borradores sobre SQLite, y la sincronización con PostgreSQL se **simula**. El móvil propone y el servidor dispone.
+
+### 12.1 Qué se implementó
+- **Esquema SQLite** ([`schema_sqlite.sql`](../../TP8/movil/schema_sqlite.sql)): cuatro tablas `STRICT` (`producto_cache`, `pedido_borrador`, `item_borrador`, `cola_sync`) más `snapshot_servidor`, con precios en centavos enteros, UUID validados y claves foráneas.
+- **Instantánea del servidor**: vista `v_snapshot_movil` en PostgreSQL, exportación a CSV e [importación](../../TP8/movil/importar_snapshot.sql) transaccional con lápidas para los productos dados de baja.
+- **Semáforo** ([`semaforo.sql`](../../TP8/movil/semaforo.sql)): `RECHAZADO` (rojo) gana sobre `CONFLICTO` (amarillo); si no, `SIMULADO_APROBADO`. `SIMULADO_APROBADO` no es una venta.
+- **Spec y diseño**: change de OpenSpec archivado y sus tres documentos derivados en [`docs/kiro/`](../../TP8/docs/kiro/) (requisitos en EARS, diseño, tareas); specs vigentes en [`TP8/openspec/specs/`](../../TP8/openspec/specs/).
+- **Plan de mantenimiento de los tres motores** ([`plan_mantenimiento_tp8.md`](../../TP8/docs/plan_mantenimiento_tp8.md)): PostgreSQL con `pg_dump` diario; MongoDB sin respaldo propio, porque se regenera desde PostgreSQL; SQLite con `VACUUM INTO` al cierre de cada jornada.
+
+### 12.2 Cómo se probó
+- Ocho tests de shell en [`TP8/tests/`](../../TP8/tests/) (esquema, importación, carga de caché, pruebas SQLite, semáforo, vista, casos y documentación), todos con salida `OK` en la última reconstrucción desde cero ([`reconstruccion_desde_cero.txt`](../../TP8/evidencias/reconstruccion_desde_cero.txt)).
+- [`correr_casos.sh`](../../TP8/scripts/correr_casos.sh) ejecuta los casos sobre `food_store_copia` (nunca sobre la base real), cambia la copia del servidor cuando el caso lo exige, la **restaura** al final y falla si PostgreSQL quedó distinto de la línea base (pedidos, stock y huella del catálogo).
+
+### 12.3 Resultados: casos de conflicto y su resolución
+| Caso | Qué se preparó | Resultado |
+|---|---|---|
+| C1 | Catálogo sin conexión ([`c1_c7_pruebas_sqlite.txt`](../../TP8/evidencias/c1_c7_pruebas_sqlite.txt)) | Se lista desde `producto_cache`, sin filas no disponibles ni eliminadas |
+| C7 | Ítem con cantidad 0 o de un producto inexistente | Se rechaza con error (restricción y clave foránea) y no queda ninguna fila |
+| C5 | Borrador sin cambios | `SIMULADO_APROBADO` |
+| C6 | Reenvío de la misma solicitud | Falla por clave primaria del UUID: no se duplica, y repetir el semáforo no reevalúa nada (`changes() = 0`) |
+| C2 | El servidor sube el precio del producto A de 2750,00 a 2990,00 | `CONFLICTO`: «producto 1: precio visto 275000, actual 299000». Al aceptar el precio nuevo se crea una solicitud nueva que termina `SIMULADO_APROBADO`; la vieja queda como historial |
+| C3 | Pide 5 unidades de un producto con stock 4 | `RECHAZADO`: «producto 24: pide 5, stock 4» |
+| C4 | El servidor da de baja el producto C | `RECHAZADO`: «producto 3: dado de baja». La fila queda como lápida (`eliminado = 1`) |
+
+Verificación final: «PostgreSQL igual a la línea base» ([`verificacion_final.txt`](../../TP8/evidencias/verificacion_final.txt)). Informe: [`docs/informe.pdf`](../../TP8/docs/informe.pdf).
+
+### 12.4 Decisiones de diseño
+- Tabla `snapshot_servidor` tipada **antes** de importar: dejar que `.import` la cree con columnas `TEXT` daba resultados erróneos en `max()` y `ORDER BY`.
+- La tablet nunca escribe en PostgreSQL, y el stock entre varias ventas lo controla el servidor al confirmar. Ante la restauración de un respaldo viejo del servidor, la tablet invalida su instantánea y reenvía los borradores afectados con UUID nuevo.
+- `PRAGMA foreign_keys = ON` en cada conexión: SQLite no lo conserva en el archivo.
+
+### 12.5 Code review asistido por IA y uso de IA
+- **Alcance:** revisión estática de **107 scripts de TP1 a TP8** (incluido el Proyecto Integrador), con 12 hallazgos y una decisión humana por cada uno ([`code_review_ia.md`](../../TP8/docs/code_review_ia.md), tabla de la sección 4). Ese archivo conserva rutas del repositorio separado en el que se trabajó el TP8 (`../../BaseDeDatos2/...`); no se modificó. El inventario cubre igualmente TP1 a TP8.
+- **Aceptados** (9): entre ellos CORR-02, medido con `EXPLAIN (ANALYZE, BUFFERS)` (621.201 filas y 2.621 buffers pasan a 12 filas y 64; 206,6 ms a 0,088 ms), e INTEG-01, comprobado en SQLite (sin el `PRAGMA` se acepta un ítem de un producto inexistente). Cuatro de los nueve son fortalezas o hallazgos históricos sin cambio de código (INTEG-02, INTEG-03, INTEG-04 e IDEM-03).
+- **Descartados con prueba** (2): CORR-01 (dos solicitudes de 2 unidades contra un stock de 3 salen ambas aprobadas, pero es una simulación y no reserva stock) y CORR-03 (la carpeta del host se llama literalmente `PosgresSQL`). SEC-01 se descartó como riesgo (son `ENUM` alfanuméricos) y se aceptó como higiene.
+- **Herramientas:** Claude Code y OpenSpec en lugar de Kiro y OpenCode, declarado como desvío en [`DUIA.md`](../../TP8/docs/DUIA.md). Bitácora en [`bitacora_ia.md`](../../TP8/docs/bitacora_ia.md). La expresión `CASE` del semáforo la escribió una persona del equipo; la IA dejó el andamiaje y el test.
