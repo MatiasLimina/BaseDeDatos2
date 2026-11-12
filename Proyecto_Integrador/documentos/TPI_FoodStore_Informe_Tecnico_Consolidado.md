@@ -468,7 +468,7 @@ CREATE INDEX idx_cliente_activo_email
 ## 3. Eje 2: Metodología de Pruebas y Protocolo de Validación
 
 ### 3.1 Entorno de Pruebas
-- **Motor:** PostgreSQL 16.2 sobre arquitectura x86_64.
+- **Motor:** PostgreSQL 16 o superior sobre arquitectura x86_64 (versión mínima de referencia de la primera entrega; los TP2 y TP3 no registraron la versión menor exacta). En la segunda entrega las versiones efectivas fueron **18.6** para el TP4 y **17.11** para los TP5 a TP7 (§7).
 - **Configuración de memoria:** `shared_buffers = 128MB`, `work_mem = 4MB`.
 - **Volumen de Datos Poblado (`seed.sql` + generador):**
   - **Categorías:** 20 registros.
@@ -559,7 +559,7 @@ flowchart TD
 
 ### Segunda entrega (Unidades 4 a 8)
 
-Las filas siguientes resumen las decisiones más significativas de cada unidad. **Los registros completos, con el prompt y la respuesta literales y la verificación de cada paso, están en los archivos enlazados**: [`TP5/BITACORA.md`](../../TP5/BITACORA.md) (más la evidencia literal de OpenCode en [`TP5/docs/ia/`](../../TP5/docs/ia/)), [`TP6/BITACORA.md`](../../TP6/BITACORA.md), [`TP7/docs/ia/consulta_ia.md`](../../TP7/docs/ia/consulta_ia.md) con [`TP7/docs/contraste_ia.md`](../../TP7/docs/contraste_ia.md), y [`TP8/docs/bitacora_ia.md`](../../TP8/docs/bitacora_ia.md) con [`TP8/docs/DUIA.md`](../../TP8/docs/DUIA.md). **El TP4 no tiene una bitácora de IA propia**: lo que se declara abajo sale de su change OPSX y de su informe, y no de un registro de prompts.
+**La DUIA unificada de la segunda entrega (U4 a U8) está en [`DUIA_U4_U8.md`](DUIA_U4_U8.md)**: por unidad declara herramienta, finalidad, prompts o specs usados, qué se aceptó, rechazó o corrigió, y cómo se verificó, además de las brechas de evidencia de cada unidad. Las filas siguientes resumen las decisiones más significativas de cada unidad. **Los registros completos, con el prompt y la respuesta literales y la verificación de cada paso, están en los archivos enlazados**: [`TP5/BITACORA.md`](../../TP5/BITACORA.md) (más la evidencia literal de OpenCode en [`TP5/docs/ia/`](../../TP5/docs/ia/)), [`TP6/BITACORA.md`](../../TP6/BITACORA.md), [`TP7/docs/ia/consulta_ia.md`](../../TP7/docs/ia/consulta_ia.md) con [`TP7/docs/contraste_ia.md`](../../TP7/docs/contraste_ia.md), y [`TP8/docs/bitacora_ia.md`](../../TP8/docs/bitacora_ia.md) con [`TP8/docs/DUIA.md`](../../TP8/docs/DUIA.md). **El TP4 no tiene una bitácora de IA propia**: lo que se declara abajo sale de su change OPSX y de su informe, y no de un registro de prompts.
 
 | Etapa / Unidad | Herramienta y modelo | Solicitud / Prompt | Código / Solución generada | Decisión: ¿Qué se aceptó? | Decisión: ¿Qué se descartó o corrigió? |
 |---|---|---|---|---|---|
